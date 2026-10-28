@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Statistical Analysis - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Statistical Analysis</h2>
+  <p>Descriptive statistics and histograms over measured metrics</p>
+</div>
+<div class="page-body">
+  <div class="panel">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label small mb-1">Variance type</label>
+        <select name="variance" class="form-select form-select-sm">{% for v in variance_types %}<option value="{{ v }}" {{ 'selected' if v==variance }}>{{ 'Sample (n - 1)' if v=='sample' else 'Population (n)' }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label small mb-1">Target complexity (one-sample t-test)</label>
+        <input type="number" step="0.5" min="0.5" max="100" name="target" value="{{ target }}" class="form-control form-control-sm"></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary">Apply</button></div>
+    </form>
+    <p class="small text-muted mt-2 mb-0"><b>Option used:</b> {{ variance }} variance. <b>Sample</b> variance divides by n-1 and is used when the data is a sample of a bigger process (default for bug data); <b>population</b> variance divides by n and is used when you have every value.</p>
+  </div>
+  {% if not has_code %}
+  <div class="alert alert-info d-flex justify-content-between align-items-center"><span><i class="fa-solid fa-file-code"></i> <b>Upload your source code first</b> - the complexity and function-size statistics need code metrics.</span>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Upload code</a></div>
+  {% endif %}
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Complexity Distribution</h6>
+        {% if stats_complexity.count %}
+        <table class="table table-sm">
+          <tr><th>Count</th><td>{{ stats_complexity.count }}</td></tr>
+          <tr><th>Mean</th><td>{{ stats_complexity.mean }}</td></tr>
+          <tr><th>Median</th><td>{{ stats_complexity.median }}</td></tr>
+          <tr><th>Variance ({{ variance }})</th><td>{{ stats_complexity.variance }}</td></tr>
+          <tr><th>Std Dev ({{ variance }})</th><td>{{ stats_complexity.std_dev }}</td></tr>
+          <tr><th>Min / Max</th><td>{{ stats_complexity.min }} / {{ stats_complexity.max }}</td></tr>
+          <tr><th>Coeff. of Variation</th><td>{{ stats_complexity.coefficient_of_variation_percent }}%</td></tr>
+        </table>
+        <p class="small text-muted">{{ stats_complexity.interpretation }}</p>
+        {% else %}
+        <p class="text-muted small mb-0">No complexity data yet - upload source files.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Function Size Distribution</h6>
+        {% if stats_func_size.count %}
+        <table class="table table-sm">
+          <tr><th>Count</th><td>{{ stats_func_size.count }}</td></tr>
+          <tr><th>Mean</th><td>{{ stats_func_size.mean }}</td></tr>
+          <tr><th>Median</th><td>{{ stats_func_size.median }}</td></tr>
+          <tr><th>Variance ({{ variance }})</th><td>{{ stats_func_size.variance }}</td></tr>
+          <tr><th>Std Dev ({{ variance }})</th><td>{{ stats_func_size.std_dev }}</td></tr>
+          <tr><th>Min / Max</th><td>{{ stats_func_size.min }} / {{ stats_func_size.max }}</td></tr>
+        </table>
+        <p class="small text-muted">{{ stats_func_size.interpretation }}</p>
+        {% else %}
+        <p class="text-muted small mb-0">No function size data yet - upload source files.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Complexity Values (Histogram)</h6>
+    <div class="how-to-read">
+      <b>How to read:</b> a histogram groups the values into equal <b>class intervals (bins)</b> and counts how many functions fall in each.
+      The <b>x-axis</b> shows the complexity range of each bin, the <b>y-axis</b> shows the frequency (number of functions), and a tall bar means
+      many functions have that complexity.
+      <br><b>Rule:</b> number of bins k = ceil(1 + log<sub>2</sub> n) (Sturges' rule); class width = ceil((max - min + 1) / k).
+    </div>
+    <div class="chart-box" id="histComplexity"></div>
+    {% if not hist_complexity.error %}<p class="small text-muted mt-2 mb-0"><i class="fa-solid fa-circle-info"></i> {{ hist_complexity.interpretation }}</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h6>Function Size (Histogram)</h6>
+    <div class="chart-box" id="histSize"></div>
+    {% if not hist_size.error %}<p class="small text-muted mt-2 mb-0"><i class="fa-solid fa-circle-info"></i> {{ hist_size.interpretation }}</p>{% endif %}
+  </div>
+
+
+  <div class="panel">
+    <h6><i class="fa-solid fa-flask"></i> Hypothesis tests <span class="text-muted small fw-normal">(scipy.stats, alpha = {{ alpha }})</span></h6>
+    <p class="small text-muted">Each test compares a null hypothesis H0 with an alternative H1. If the p-value is below alpha, H0 is rejected. Tests with too little data show a warning instead of a result.</p>
+    {% for t in tests %}
+    <div class="panel test-card {{ 'reject' if t.reject else ('keep' if t.ok else '') }} mb-3">
+      <h6>{{ t.title }}</h6>
+      <p class="small mb-1"><b>H0:</b> {{ t.h0 }}<br><b>H1:</b> {{ t.h1 }}</p>
+      {% if t.table.rows %}
+      <div class="table-responsive"><table class="table table-sm table-bordered w-auto mb-2">
+        <thead><tr>{% for h in t.table.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in t.table.rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+      {% endif %}
+      {% if t.ok %}
+      <div class="row text-center g-2 mb-2">
+        <div class="col"><div class="fw-bold">{{ t.statistic }}</div><div class="small text-muted">statistic</div></div>
+        <div class="col"><div class="fw-bold">{{ t.df }}</div><div class="small text-muted">degrees of freedom</div></div>
+        <div class="col"><div class="fw-bold">{{ t.p_value }}</div><div class="small text-muted">p-value</div></div>
+        <div class="col"><div class="fw-bold">{{ t.alpha }}</div><div class="small text-muted">alpha</div></div>
+      </div>
+      {% endif %}
+      {% for w in t.warnings %}<div class="alert alert-warning py-1 small mb-2"><i class="fa-solid fa-triangle-exclamation"></i> {{ w }}</div>{% endfor %}
+      <p class="mb-0 fw-bold {{ 'text-danger' if t.reject else ('text-success' if t.ok else 'text-muted') }}">{{ t.conclusion }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.histogram('histComplexity', {{ hist_complexity.labels|tojson }}, {{ hist_complexity.counts|tojson }}, 'Cyclomatic complexity range (bins)', 'Frequency (number of functions)');
+SQMA.histogram('histSize', {{ hist_size.labels|tojson }}, {{ hist_size.counts|tojson }}, 'Function size range in lines (bins)', 'Frequency (number of functions)');
+</script>
+{% endblock %}

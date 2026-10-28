@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Alerts - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Alerts</h2>
+  <p>Recomputed every time this page opens: aging bugs, growing backlog, critical security bugs, red releases, and code-metric thresholds</p>
+</div>
+<div class="page-body">
+  <div class="panel">
+    {% if alerts %}
+    <table class="table table-sm align-middle">
+      <thead><tr><th>Message</th><th>Level</th><th>Source</th><th></th></tr></thead>
+      <tbody>
+      {% for a in alerts %}
+        <tr>
+          <td>{{ a.message }}</td>
+          <td><span class="badge badge-{{ a.level|lower }}">{{ a.level }}</span></td>
+          <td class="small text-muted">{{ a.source }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('delete_alert', project_id=project.id, alert_id=a.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small mb-0">No alerts - every monitored value is within its limit. Alerts appear here when bugs get old, the backlog grows, a serious security bug is open, a release turns Red, or code metrics cross a threshold.</p>
+    {% endif %}
+  </div>
+  <p class="small text-muted"><b>Rules:</b> Aging: open &gt; 30 days (Warning, Critical for Critical/High bugs). Backlog: open &gt; closed (Warning; Critical when open &gt; 2 x closed). Security: open security bug with severity Critical/High or CVSS &ge; 7 (Critical). Release RED (Critical). Code: defect density &gt;4/&gt;8, avg complexity &gt;10/&gt;15, any High security finding, maintainability &lt;40.</p>
+  {% include "_ai_reco.html" %}
+</div>
+{% endblock %}

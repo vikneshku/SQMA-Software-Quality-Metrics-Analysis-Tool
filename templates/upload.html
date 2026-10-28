@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Source Code Upload - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Source Code Upload</h2>
+  <p>Upload a whole project folder (sub-folders are kept) or individual files. Supported: {{ limits.exts|join(' ') }}</p>
+</div>
+<div class="page-body">
+  <div class="panel">
+    <div class="alert alert-info py-2 small">
+      <b>Limits:</b> {{ limits.max_mb }} MB per upload &middot; {{ limits.max_files }} useful files per upload &middot; a single file over {{ limits.max_file_mb }} MB is skipped.
+      Junk is skipped automatically (folders: {{ limits.skip_dirs|join(', ') }}; binary and minified files). Uploading again adds new files and replaces files with the same path.
+    </div>
+    <div id="dropzone" class="dropzone">
+      <i class="fa-solid fa-folder-open"></i>
+      <h5 class="mt-2">Drag &amp; drop a project folder or files here</h5>
+      <p class="text-muted mb-3">or</p>
+      <button type="button" class="btn btn-primary" id="btnFolder"><i class="fa-solid fa-folder"></i> Choose Project Folder</button>
+      <button type="button" class="btn btn-outline-primary" id="btnFiles"><i class="fa-solid fa-file"></i> Choose Files</button>
+      <input type="file" id="inFolder" webkitdirectory multiple hidden>
+      <input type="file" id="inFiles" multiple hidden accept="{{ limits.exts|join(',') }}">
+    </div>
+    <noscript><p class="text-danger mt-2">JavaScript is required for uploads.</p></noscript>
+
+    <div id="preview" class="mt-3" hidden>
+      <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center">
+        <div><b id="pvSummary"></b><div class="small text-muted" id="pvSkips"></div></div>
+        <div class="d-flex gap-2"><button class="btn btn-outline-secondary btn-sm" id="btnClear" type="button">Clear</button>
+          <button class="btn btn-success" id="btnUpload" type="button"><i class="fa-solid fa-upload"></i> Upload &amp; Analyse</button></div>
+      </div>
+      <div class="alert alert-danger py-2 small mt-2" id="pvError" hidden></div>
+      <div class="preview-list mt-2" id="pvList"></div>
+      <div class="progress mt-3" style="height:18px" id="pvProgressWrap" hidden><div class="progress-bar" id="pvProgress" style="width:0%">0%</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Analysed files ({{ rows|length }})</h6>
+    {% include "_files_table.html" %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var LIM = {{ limits|tojson }};
+  var MAX_BYTES = LIM.max_mb * 1024 * 1024, MAX_FILE = LIM.max_file_mb * 1024 * 1024;
+  var SKIP = new Set(LIM.skip_dirs), EXTS = new Set(LIM.exts);
+  var BIN = new Set(['.png','.jpg','.jpeg','.gif','.bmp','.ico','.webp','.pdf','.zip','.gz','.tar','.7z','.rar','.exe','.dll','.so','.dylib','.class','.jar','.pyc','.pyo','.o','.obj','.a','.lib','.bin','.dat','.db','.sqlite','.mp3','.mp4','.avi','.mov','.wav','.ttf','.woff','.woff2','.eot','.doc','.docx','.xls','.xlsx','.ppt','.pptx']);
+  var CSRF = {{ csrf_token()|tojson }};
+  var queue = [], skipped = {}, scanning = 0;
+
+  function $(id) { return document.getElementById(id); }
+  function bump(reason, n) { skipped[reason] = (skipped[reason] || 0) + (n || 1); }
+  function ext(name) { var i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i).toLowerCase(); }
+  function cleanPath(p) { return p.replace(/\\/g, '/').replace(/^\/+/, ''); }
+
+  function reasonFor(path, size) {
+    var parts = path.split('/'), name = parts[parts.length - 1].toLowerCase();
+    for (var i = 0; i < parts.length - 1; i++) if (SKIP.has(parts[i])) return parts[i];
+    var e = ext(name);
+    if (BIN.has(e)) return 'binary';
+    if (name.endsWith('.min.js')) return 'minified';
+    if (size > MAX_FILE) return 'too large (>' + LIM.max_file_mb + ' MB)';
+    if (!EXTS.has(e)) return 'unsupported type';
+    return null;
+  }
+
+  async function consider(file, path) {
+    path = cleanPath(path || file.webkitRelativePath || file.name);
+    var why = reasonFor(path, file.size);
+    if (!why) {                               // NUL byte in the first 8 KB means binary
+      try {
+        var buf = new Uint8Array(await file.slice(0, 8192).arrayBuffer());
+        if (buf.indexOf(0) >= 0) why = 'binary';
+      } catch (e) { /* ignore */ }
+    }
+    if (why) { bump(why); return; }
+    if (queue.some(function (q) { return q.path === path; })) return;     // same path twice: keep one
+    queue.push({ file: file, path: path });
+  }
+
+  async function addFileList(list) {
+    scanning++; render();
+    for (var i = 0; i < list.length; i++) await consider(list[i], list[i].webkitRelativePath || list[i].name);
+    scanning--; render();
+  }
+
+  // ---- dropped folders: read entries recursively (DataTransferItem.webkitGetAsEntry)
+  function readAll(reader) {
+    return new Promise(function (res, rej) {
+      var all = [];
+      (function next() { reader.readEntries(function (b) { if (!b.length) return res(all); all = all.concat(b); next(); }, rej); })();
+    });
+  }
+  function fileOf(entry) { return new Promise(function (res, rej) { entry.file(res, rej); }); }
+  async function countDir(entry, cap) {     // count files inside a skipped folder without reading them
+    var n = 0, stack = [entry];
+    while (stack.length && n < cap) {
+      var e = stack.pop(), kids = await readAll(e.createReader());
+      for (var k of kids) { if (k.isDirectory) stack.push(k); else n++; }
+    }
+    return n;
+  }
+  async function walk(entry, prefix) {
+    if (entry.isFile) { try { await consider(await fileOf(entry), prefix + entry.name); } catch (e) { bump('unreadable'); } return; }
+    if (SKIP.has(entry.name)) { bump(entry.name, await countDir(entry, 50000)); return; }
+    var kids = await readAll(entry.createReader());
+    for (var k of kids) await walk(k, prefix + entry.name + '/');
+  }
+  async function handleDrop(items) {
+    scanning++; render();
+    var entries = [];
+    for (var i = 0; i < items.length; i++) { var en = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry(); if (en) entries.push(en); }
+    for (var e of entries) await walk(e, '');
+    scanning--; render();
+  }
+
+  // ---- preview
+  function fmt(n) { return n.toLocaleString(); }
+  function render() {
+    var total = queue.reduce(function (a, q) { return a + q.file.size; }, 0);
+    var nSk = Object.values(skipped).reduce(function (a, b) { return a + b; }, 0);
+    $('preview').hidden = !(queue.length || nSk || scanning);
+    $('pvSummary').textContent = scanning ? 'Scanning...' : 'Accepted ' + fmt(queue.length) + ' file' + (queue.length === 1 ? '' : 's') + ' (' + (total / 1048576).toFixed(2) + ' MB), skipped ' + fmt(nSk);
+    var sk = Object.entries(skipped).sort(function (a, b) { return b[1] - a[1]; }).map(function (x) { return x[0] + ': ' + fmt(x[1]); }).join(', ');
+    $('pvSkips').textContent = sk ? 'Skipped: ' + sk : '';
+    $('pvList').innerHTML = '';
+    queue.slice(0, 300).forEach(function (q) { var d = document.createElement('div'); d.textContent = q.path + '  (' + (q.file.size / 1024).toFixed(1) + ' KB)'; $('pvList').appendChild(d); });
+    if (queue.length > 300) { var m = document.createElement('div'); m.textContent = '... and ' + fmt(queue.length - 300) + ' more'; $('pvList').appendChild(m); }
+    var err = '';
+    if (queue.length > LIM.max_files) err = 'Too many files: ' + queue.length + ' useful files, the limit is ' + LIM.max_files + '. Remove some files or upload sub-folders separately.';
+    else if (total > MAX_BYTES) err = 'Total size is over ' + LIM.max_mb + ' MB. Remove some files or upload sub-folders separately.';
+    $('pvError').hidden = !err; $('pvError').textContent = err;
+    $('btnUpload').disabled = !!err || !queue.length || !!scanning;
+  }
+
+  function reset() { queue = []; skipped = {}; render(); }
+  $('btnClear').onclick = reset;
+  $('btnFolder').onclick = function () { $('inFolder').click(); };
+  $('btnFiles').onclick = function () { $('inFiles').click(); };
+  $('inFolder').onchange = function () { addFileList(Array.from(this.files)); this.value = ''; };
+  $('inFiles').onchange = function () { addFileList(Array.from(this.files)); this.value = ''; };
+  var dz = $('dropzone');
+  ['dragenter', 'dragover'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('over'); }); });
+  dz.addEventListener('drop', function (e) {
+    if (e.dataTransfer.items && e.dataTransfer.items.length && e.dataTransfer.items[0].webkitGetAsEntry) handleDrop(e.dataTransfer.items);
+    else addFileList(Array.from(e.dataTransfer.files));
+  });
+
+  $('btnUpload').onclick = function () {
+    var fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    queue.forEach(function (q) { fd.append('source_files', q.file, q.file.name); fd.append('paths', q.path); });
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', location.href);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.setRequestHeader('Accept', 'application/json');
+    $('pvProgressWrap').hidden = false; $('btnUpload').disabled = true;
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable) { var p = Math.round(e.loaded / e.total * 100); $('pvProgress').style.width = p + '%'; $('pvProgress').textContent = p + '%'; } };
+    xhr.onload = function () {
+      var r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) { r = { message: 'Upload failed (status ' + xhr.status + ').' }; }
+      var clientSk = Object.entries(skipped).map(function (x) { return x[0] + ': ' + fmt(x[1]); }).join(', ');
+      if (xhr.status === 200) {
+        sessionStorage.setItem('sqmaUploadMsg', r.message + (clientSk ? ' Skipped in your browser: ' + clientSk + '.' : ''));
+        location.href = r.redirect || location.href;
+      } else { $('pvError').hidden = false; $('pvError').textContent = r.message || 'Upload failed.'; $('btnUpload').disabled = false; }
+    };
+    xhr.onerror = function () { $('pvError').hidden = false; $('pvError').textContent = 'Network error while uploading.'; $('btnUpload').disabled = false; };
+    xhr.send(fd);
+  };
+  var saved = sessionStorage.getItem('sqmaUploadMsg');
+  if (saved) {
+    sessionStorage.removeItem('sqmaUploadMsg');
+    var a = document.createElement('div'); a.className = 'alert alert-success m-3'; a.textContent = saved;
+    document.querySelector('.page-header').after(a);
+  }
+})();
+</script>
+{% endblock %}

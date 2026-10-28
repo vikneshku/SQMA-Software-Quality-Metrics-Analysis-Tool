@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Maintainability - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Maintainability</h2>
+  <p>Maintainability Index per file (average function size + complexity), combined into a LOC-weighted project score</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="metric-card text-center">
+        <div class="metric-label">Project Maintainability Index</div>
+        <div class="metric-value">{{ maintainability.mi_score }}%</div>
+        <span class="text-muted">{{ maintainability.band }}</span>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel h-100">
+        <h6>Interpretation Bands (project-defined, calibrated)</h6>
+        <table class="table table-sm mb-0">
+          <tr><td>{{ bands.high|int }} - 100</td><td>Highly maintainable</td></tr>
+          <tr><td>{{ bands.moderate|int }} - {{ (bands.high - 0.1)|round(1) }}</td><td>Moderately maintainable</td></tr>
+          <tr><td>0 - {{ (bands.moderate - 0.1)|round(1) }}</td><td>Difficult to maintain</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h6>Formula</h6>
+    <p class="mb-1"><code>MI = max(0, min(100, (171 - 5.2&middot;ln(HV) - 0.23&middot;CC - 16.2&middot;ln(avgFnLOC)) &times; 100 / 171))</code>, with <code>HV = avgFnLOC &times; log2(12)</code></p>
+    <p class="small text-muted mb-0">Calculated per file from its average function size (avgFnLOC) and average complexity (CC); the project value is the LOC-weighted average of the file values.
+      Check: avg function 20 lines &amp; CC 4 = 58; 50 lines &amp; CC 25 = 44; 100 lines &amp; CC 30 = 34. HV is a documented approximation, not a full Halstead tokenizer.</p>
+  </div>
+  <div class="panel">
+    <h6>Per-file maintainability (lowest first)</h6>
+    <table class="table table-sm align-middle sortable">
+      <thead><tr><th data-sort="text">File</th><th data-sort="num">LOC</th><th data-sort="num">Avg function lines</th><th data-sort="num">Avg complexity</th><th data-sort="num">MI</th><th data-sort="text">Band</th></tr></thead>
+      <tbody>
+      {% for f in files %}
+        <tr><td>{{ f.file }}</td><td>{{ f.loc }}</td><td>{{ f.avg_function_loc }}</td><td>{{ f.avg_complexity }}</td><td>{{ f.mi_score }}</td>
+          <td><span class="badge {{ 'badge-low' if f.mi_score >= bands.high else ('badge-medium' if f.mi_score >= bands.moderate else 'badge-high') }}">{{ f.band }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

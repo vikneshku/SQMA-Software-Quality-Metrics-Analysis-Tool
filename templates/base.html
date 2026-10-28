@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}Software Quality & Metrics Analysis Tool{% endblock %}</title>
+<link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="d-flex">
+  {% if project %}
+  <nav class="sidebar d-print-none">
+    <div class="sidebar-brand">
+      <i class="fa-solid fa-chart-line"></i> SQMA Tool
+    </div>
+    <div class="sidebar-project">
+      <small>Project</small>
+      <div class="fw-bold text-truncate">{{ project.name }}</div>
+      <a href="{{ url_for('index') }}" class="small-link"><i class="fa-solid fa-arrow-left"></i> All Projects</a>
+    </div>
+    <ul class="nav flex-column sidebar-nav">
+      <li><a href="{{ url_for('dashboard', project_id=project.id) }}" class="{{ 'active' if active=='dashboard' }}"><i class="fa-solid fa-gauge"></i> 1. Home Dashboard</a></li>
+      <li><a href="{{ url_for('goals_page', project_id=project.id) }}" class="{{ 'active' if active=='goals' }}"><i class="fa-solid fa-bullseye"></i> 2. Goals (GQM)</a></li>
+      <li><a href="{{ url_for('upload_source', project_id=project.id) }}" class="{{ 'active' if active=='upload' }}"><i class="fa-solid fa-upload"></i> 3. Source Code Upload</a></li>
+      <li><a href="{{ url_for('files.files_page', project_id=project.id) }}" class="{{ 'active' if active=='files' }}"><i class="fa-solid fa-folder-tree"></i> 4. Files</a></li>
+      <li><a href="{{ url_for('files.issues_page', project_id=project.id) }}" class="{{ 'active' if active=='issues' }}"><i class="fa-solid fa-bug-slash"></i> 5. Code Issues</a></li>
+      <li><a href="{{ url_for('files.project_metrics_page', project_id=project.id) }}" class="{{ 'active' if active=='project_metrics' }}"><i class="fa-solid fa-table-list"></i> 6. Project Metrics</a></li>
+      <li><a href="{{ url_for('bugs.bug_list', project_id=project.id) }}" class="{{ 'active' if active=='bugs' }}"><i class="fa-solid fa-bug"></i> 7. Bug Management</a></li>
+      <li><a href="{{ url_for('bugs.releases', project_id=project.id) }}" class="{{ 'active' if active=='releases' }}"><i class="fa-solid fa-tags"></i> 8. Releases</a></li>
+      <li><a href="{{ url_for('control_chart_page', project_id=project.id) }}" class="{{ 'active' if active=='control_chart' }}"><i class="fa-solid fa-chart-line"></i> 9. Control Chart</a></li>
+      <li><a href="{{ url_for('size_page', project_id=project.id) }}" class="{{ 'active' if active=='size' }}"><i class="fa-solid fa-ruler"></i> 10. Software Size</a></li>
+      <li><a href="{{ url_for('complexity_page', project_id=project.id) }}" class="{{ 'active' if active=='complexity' }}"><i class="fa-solid fa-diagram-project"></i> 11. Complexity</a></li>
+      <li><a href="{{ url_for('quality_page', project_id=project.id) }}" class="{{ 'active' if active=='quality' }}"><i class="fa-solid fa-award"></i> 12. Quality Metrics</a></li>
+      <li><a href="{{ url_for('statistics_page', project_id=project.id) }}" class="{{ 'active' if active=='statistics' }}"><i class="fa-solid fa-chart-simple"></i> 13. Statistical Analysis</a></li>
+      <li><a href="{{ url_for('correlation_page', project_id=project.id) }}" class="{{ 'active' if active=='correlation' }}"><i class="fa-solid fa-arrows-left-right"></i> 14. Correlation</a></li>
+      <li><a href="{{ url_for('boxplot_page', project_id=project.id) }}" class="{{ 'active' if active=='boxplot' }}"><i class="fa-solid fa-box"></i> 15. Box Plot</a></li>
+      <li><a href="{{ url_for('decision_tree_page', project_id=project.id) }}" class="{{ 'active' if active=='decision_tree' }}"><i class="fa-solid fa-sitemap"></i> 16. Decision Tree</a></li>
+      <li><a href="{{ url_for('defect_prediction_page', project_id=project.id) }}" class="{{ 'active' if active=='defect_prediction' }}"><i class="fa-solid fa-magnifying-glass-chart"></i> 17. Defect Prediction</a></li>
+      <li><a href="{{ url_for('risk_prediction_page', project_id=project.id) }}" class="{{ 'active' if active=='risk_prediction' }}"><i class="fa-solid fa-triangle-exclamation"></i> 18. Risk Prediction</a></li>
+      <li><a href="{{ url_for('security_page', project_id=project.id) }}" class="{{ 'active' if active=='security' }}"><i class="fa-solid fa-shield-halved"></i> 19. Security Analysis</a></li>
+      <li><a href="{{ url_for('maintainability_page', project_id=project.id) }}" class="{{ 'active' if active=='maintainability' }}"><i class="fa-solid fa-wrench"></i> 20. Maintainability</a></li>
+      <li><a href="{{ url_for('alerts_page', project_id=project.id) }}" class="{{ 'active' if active=='alerts' }}"><i class="fa-solid fa-bell"></i> 21. Alerts</a></li>
+      <li><a href="{{ url_for('ai.chat_page', project_id=project.id) }}" class="{{ 'active' if active=='ai' }}"><i class="fa-solid fa-robot"></i> 22. AI Assistant</a></li>
+      <li><a href="{{ url_for('report_page', project_id=project.id) }}" class="{{ 'active' if active=='report' }}"><i class="fa-solid fa-file-lines"></i> 23. Reports</a></li>
+      <li><a href="{{ url_for('auth.users', project=project.id) }}" class="{{ 'active' if active=='users' }}"><i class="fa-solid fa-users"></i> 24. Users</a></li>
+    </ul>
+  </nav>
+  {% endif %}
+
+  <div class="layout-col">
+  {% if current_user %}
+  <div class="topbar d-print-none">
+    <a href="{{ url_for('index') }}"><i class="fa-solid fa-folder-open"></i> Projects</a>
+    <a href="{{ url_for('auth.users') }}"><i class="fa-solid fa-users"></i> Users</a>
+    <a href="{{ url_for('auth.profile') }}"><i class="fa-solid fa-user"></i> {{ current_user.display_name }}</a>
+    <span class="role-pill">{{ current_user.role }}</span>
+    <form method="POST" action="{{ url_for('auth.logout') }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="link-btn"><i class="fa-solid fa-right-from-bracket"></i> Log out</button></form>
+  </div>
+  {% endif %}
+  <main class="main-content {% if not project %}full-width{% endif %}">
+    {% if show_selector %}
+    <form method="GET" class="file-selector d-print-none d-flex align-items-center gap-2 flex-wrap mt-3">
+      {% for k, v in sel_hidden %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+      <label class="small fw-bold mb-0"><i class="fa-solid fa-file-code"></i> Analyse:</label>
+      <select name="file" class="form-select form-select-sm w-auto" style="max-width:420px" onchange="this.form.submit()">
+        <option value="">All files (whole project)</option>
+        {% for f in sel_files %}<option value="{{ f.id }}" {{ 'selected' if sel_id == f.id }}>{{ f.relpath or f.filename }}</option>{% endfor %}
+      </select>
+      {% if sel_id %}<span class="small text-muted">Numbers below are for this file only.</span>
+        {% if sel_no_bugs %}<span class="badge badge-warning">no bugs linked to this file</span>{% endif %}{% endif %}
+    </form>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'danger' if category=='danger' else category }} alert-dismissible fade show m-3" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<!-- Bootstrap, Font Awesome and Chart.js are all bundled locally (static/vendor, static/js) so the tool works without internet -->
+<script src="{{ url_for('static', filename='js/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/viz.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai.js') }}"></script>
+{% block scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+</body>
+</html>

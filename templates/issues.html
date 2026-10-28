@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Code Issues - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div><h2>Code Issues</h2><p>Problems found in the source code (security, complexity, maintainability, style). Different from Bug Management: log an issue as a bug when you decide to fix it.</p></div>
+  <div class="btn-group">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('files.issues_export', project_id=project.id, fmt='csv', **request.args) }}"><i class="fa-solid fa-file-csv"></i> CSV</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('files.issues_export', project_id=project.id, fmt='json', **request.args) }}"><i class="fa-solid fa-file-code"></i> JSON</a>
+  </div>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Total issues</div><div class="metric-value">{{ total }}</div></div></div>
+    {% for s in ['High','Medium','Low'] %}
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">{{ s }}</div><div class="metric-value">{{ sev_counts[s] }}</div><span class="badge badge-{{ s|lower }}">{{ s }}</span></div></div>
+    {% endfor %}
+  </div>
+  <div class="panel">
+    <form method="GET" class="row g-2 align-items-end mb-3">
+      <div class="col-md-3"><label class="form-label small mb-1">File</label><select name="file" class="form-select form-select-sm"><option value="">All files</option>
+        {% for f in files %}<option value="{{ f.id }}" {{ 'selected' if flt.file == f.id|string }}>{{ f.relpath or f.filename }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Severity</label><select name="severity" class="form-select form-select-sm"><option value="">All</option>{% for s in ['High','Medium','Low'] %}<option {{ 'selected' if flt.severity==s }}>{{ s }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Category</label><select name="category" class="form-select form-select-sm"><option value="">All</option>{% for c in categories %}<option {{ 'selected' if flt.category==c }}>{{ c }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Type</label><select name="type" class="form-select form-select-sm"><option value="">All</option>{% for t in types %}<option {{ 'selected' if flt.type==t }}>{{ t }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label small mb-1">Search</label><input name="q" value="{{ flt.q }}" class="form-control form-control-sm" placeholder="text..."></div>
+      <div class="col-12 d-flex gap-2"><button class="btn btn-sm btn-primary"><i class="fa-solid fa-filter"></i> Filter</button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('files.issues_page', project_id=project.id) }}">Clear</a>
+        {% if sev_counts.High %}<form method="POST" action="{{ url_for('files.issues_log_high', project_id=project.id) }}" onsubmit="return confirm('Log all {{ sev_counts.High }} High-severity issues as bugs? Issues already logged are skipped.');" class="ms-auto"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-danger"><i class="fa-solid fa-bug"></i> Log all High issues as bugs</button></form>{% endif %}
+      </div>
+    </form>
+    {% if issues %}
+    <p class="small text-muted">Showing {{ issues|length }} of {{ total_matching }} matching issue(s){% if total_matching > issues|length %} (first 500 - use the filters or export for the rest){% endif %}.</p>
+    <div class="table-responsive"><table class="table table-sm align-middle sortable">
+      <thead><tr><th data-sort="text">File</th><th data-sort="num">Line</th><th data-sort="text">Type</th><th data-sort="text">Category</th><th data-sort="text">Severity</th><th>Description</th><th></th></tr></thead>
+      <tbody>
+      {% for i in issues %}
+        <tr>
+          <td><a href="{{ url_for('files.file_detail', project_id=project.id, file_id=i.code_file_id) }}#L{{ i.line_number }}">{{ i.code_file.relpath or i.code_file.filename }}</a></td>
+          <td>{{ i.line_number }}</td><td>{{ i.issue_type }}</td><td class="small">{{ i.category }}</td>
+          <td><span class="badge badge-{{ i.severity|lower }}">{{ i.severity }}</span></td>
+          <td class="small" title="{{ i.fix_suggestion }}">{{ i.description }}</td>
+          <td class="text-nowrap">{% include "_issue_row_button.html" %}</td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% elif total %}<p class="text-muted small mb-0">No issue matches these filters.</p>
+    {% else %}<div class="chart-empty"><i class="fa-solid fa-circle-check"></i><span>No issues found{% if not files %} - upload source code first{% endif %}.</span>
+      {% if not files %}<a class="btn btn-sm btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Go to upload</a>{% endif %}</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

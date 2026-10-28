@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Complexity - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Cyclomatic Complexity</h2>
+  <p>V(G) = E - N + 2P, computed per function via decision-point counting</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Average Complexity</div><div class="metric-value">{{ analysis.avg_complexity }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Max Complexity</div><div class="metric-value">{{ analysis.max_complexity }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Functions Measured</div><div class="metric-value">{{ units|length }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Max Nesting Depth</div><div class="metric-value">{{ analysis.structure.max_nesting_depth }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <p class="text-muted small mb-2">
+      <i class="fa-solid fa-circle-info"></i> Risk thresholds below are <strong>project-defined</strong>, not universal
+      standards: Low (1-5), Moderate (6-10), High (11-20), Very High (21+).
+    </p>
+    <h6>Functions Ranked by Complexity</h6>
+    {% if units %}
+    <table class="table table-sm">
+      <thead><tr><th>Function</th><th>File</th><th>Line</th><th>Complexity</th><th>Risk</th></tr></thead>
+      <tbody>
+      {% for u in units %}
+        <tr>
+          <td>{{ u.name }}</td>
+          <td>{{ u.file }}</td>
+          <td>{{ u.line }}</td>
+          <td>{{ u.complexity }}</td>
+          <td><span class="badge badge-{{ u.risk_level|lower|replace(' ', '-') }}">{{ u.risk_level }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small mb-0">No functions found yet. Upload source files first.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h6>Structural Metrics</h6>
+    <div class="row text-center">
+      <div class="col"><div class="fw-bold fs-4">{{ analysis.structure.branches }}</div><div class="text-muted small">Branches</div></div>
+      <div class="col"><div class="fw-bold fs-4">{{ analysis.structure.loops }}</div><div class="text-muted small">Loops</div></div>
+      <div class="col"><div class="fw-bold fs-4">{{ analysis.structure.imports }}</div><div class="text-muted small">Imports</div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Security Analysis - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Security Analysis</h2>
+  <p>Lightweight, rule-based, explainable project scanner - not a replacement for professional SAST/DAST tools</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">High Severity</div><div class="metric-value text-danger">{{ analysis.security_counts.High }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Medium Severity</div><div class="metric-value text-warning">{{ analysis.security_counts.Medium }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Low Severity</div><div class="metric-value text-success">{{ analysis.security_counts.Low }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Overall security risk</div><div class="metric-value {{ 'text-danger' if summary.level=='High' else ('text-warning' if summary.level=='Medium' else 'text-success') }}">{{ summary.level }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <h6>Security analysis process representation</h6>
+    <div class="how-to-read">
+      <b>How to read:</b> the database-style stack shows what the scanner did. Each layer is one step with its count in the circle:
+      <b>High / Medium / Low</b> severity findings, the <b>files scanned</b>, and the <b>rules applied</b>. The <b>padlock</b> summarises the result:
+      <span style="color:#dc2626"><b>open</b></span> when any High-severity issue exists, <span style="color:#d97706"><b>amber</b></span> for Medium only, <span style="color:#16a34a"><b>closed &amp; green</b></span> when the code is clean.
+    </div>
+    <div id="securityStack" class="chart-box auto"></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Findings by issue type</h6>
+        <div class="chart-box short" id="secTypes"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Rules the scanner applies</h6>
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Rule</th><th>Severity</th></tr></thead>
+          <tbody>
+          {% for r in rules %}<tr><td>{{ r[0] }}</td><td><span class="badge badge-{{ r[1]|lower }}">{{ r[1] }}</span></td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Findings</h6>
+    {% if analysis.security_findings %}
+    <table class="table table-sm">
+      <thead><tr><th>Issue</th><th>File</th><th>Line</th><th>Severity</th><th>Description</th></tr></thead>
+      <tbody>
+      {% for f in analysis.security_findings %}
+        <tr>
+          <td>{{ f.issue_type }}</td><td>{{ f.file }}</td><td>{{ f.line_number }}</td>
+          <td><span class="badge badge-{{ f.severity|lower }}">{{ f.severity }}</span></td>
+          <td class="small">{{ f.description }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small mb-0">No security issues detected in uploaded files{% if not analysis.size.num_files %} (no files uploaded yet){% endif %}.</p>
+    {% endif %}
+    <p class="small text-muted mt-2 mb-0">Security score used in the Quality Score = 100 - (15 &times; High + 7 &times; Medium + 2 &times; Low).</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.securityStack('securityStack', {{ summary|tojson }});
+SQMA.bars('secTypes', {{ summary.type_labels|tojson }}, {{ summary.type_values|tojson }},
+  { horizontal: true, colors: {{ summary.type_colors|tojson }}, xTitle: 'Number of findings', label: 'Findings', emptyMsg: 'No security findings to chart.' });
+</script>
+{% endblock %}

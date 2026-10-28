@@ -1,0 +1,21 @@
+{# expects project, tips (list of rule-based tips). AI answer is optional; tips always stay visible. #}
+<div class="panel" id="recoPanel">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h6 class="mb-0"><i class="fa-solid fa-lightbulb"></i> Recommendations</h6>
+    <button class="btn btn-sm btn-primary d-print-none" id="btnReco"><i class="fa-solid fa-robot"></i> Get AI recommendations</button>
+  </div>
+  <div id="aiReco" class="mt-3 ai-answer" hidden></div>
+  <div id="aiNote" class="small text-muted mt-2"></div>
+  <h6 class="mt-3 mb-1 small text-uppercase text-muted">Rule-based tips (always available)</h6>
+  <ul class="mb-0">{% for t in tips %}<li>{{ t }}</li>{% endfor %}</ul>
+</div>
+<script>
+document.getElementById('btnReco').addEventListener('click', async function () {
+  var btn = this, box = document.getElementById('aiReco'), note = document.getElementById('aiNote');
+  btn.disabled = true; note.textContent = 'Asking the AI...';
+  var r = await SQMA_AI.post({{ url_for('ai.recommend', project_id=project.id)|tojson }}, {});
+  btn.disabled = false;
+  if (r.ok) { box.hidden = false; SQMA_AI.render(box, r.answer); note.textContent = 'AI recommendations (prioritised). The rule-based tips below remain as a backup.'; }
+  else { box.hidden = true; note.textContent = (r.fallback_note || 'AI unavailable - showing rule-based tips.') + ' ' + (r.message || ''); }
+});
+</script>

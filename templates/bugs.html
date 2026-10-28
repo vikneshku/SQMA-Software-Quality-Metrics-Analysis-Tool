@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Bug Management - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2>Bug Management</h2>
+    <p>Log and track defects. These records feed the <a href="{{ url_for('control_chart_page', project_id=project.id) }}">Control Chart</a>, the Dashboard, release readiness, alerts and every defect metric.</p>
+  </div>
+  <a href="{{ url_for('export_data', project_id=project.id, data_type='bugs') }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+    <i class="fa-solid fa-file-export"></i> Export JSON
+  </a>
+</div>
+<div class="page-body">
+  <div class="panel">
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Add New Bug</h6>
+      <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#addBug"><i class="fa-solid fa-plus"></i> {{ 'Hide form' if show_form else 'Show form' }}</button>
+    </div>
+    <div class="collapse {{ 'show' if show_form or not total }} mt-3" id="addBug">
+      <form method="POST" class="row g-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% with today=today %}{% include "_bug_fields.html" %}{% endwith %}
+        <div class="col-12"><button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add bug</button></div>
+      </form>
+      <p class="small text-muted mt-2 mb-0"><i class="fa-solid fa-circle-info"></i>
+        <b>Date reported</b> decides which day the bug counts on in the Control Chart. <b>Found in = Production</b> means the bug escaped testing (Escape Rate).</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="GET" class="row g-2 align-items-end mb-3">
+      <div class="col-md-2"><label class="form-label small mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm"><option value="">All</option><option value="open" {{ 'selected' if flt.status=='open' }}>Open (any)</option>
+          {% for o in statuses %}<option {{ 'selected' if flt.status==o }}>{{ o }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Severity</label>
+        <select name="severity" class="form-select form-select-sm"><option value="">All</option>{% for o in severities %}<option {{ 'selected' if flt.severity==o }}>{{ o }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Module</label>
+        <select name="module" class="form-select form-select-sm"><option value="">All</option>{% for m in modules %}<option {{ 'selected' if flt.module==m }}>{{ m }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Assigned to</label>
+        <select name="assignee" class="form-select form-select-sm"><option value="">Anyone</option><option value="none" {{ 'selected' if flt.assignee=='none' }}>Unassigned</option>
+          {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if flt.assignee==u.id|string }}>{{ u.username }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Release</label>
+        <select name="release" class="form-select form-select-sm"><option value="">All</option><option value="none" {{ 'selected' if flt.release=='none' }}>No release</option>
+          {% for r in releases %}<option value="{{ r.id }}" {{ 'selected' if flt.release==r.id|string }}>{{ r.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">OWASP</label>
+        <select name="owasp" class="form-select form-select-sm"><option value="">All</option><option value="any" {{ 'selected' if flt.owasp=='any' }}>Any security bug</option>
+          {% for o in owasp_options[1:] %}<option {{ 'selected' if flt.owasp==o }}>{{ o }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><input name="q" class="form-control form-control-sm" placeholder="Search title / description" value="{{ flt.q }}"></div>
+      <div class="col-md-8 d-flex gap-2">
+        <button class="btn btn-sm btn-primary"><i class="fa-solid fa-filter"></i> Filter</button>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Clear</a>
+        <a class="btn btn-sm {{ 'btn-info' if flt.mine else 'btn-outline-info' }}" href="{{ url_for('bugs.bug_list', project_id=project.id, mine=1) }}"><i class="fa-solid fa-user-check"></i> My bugs</a>
+      </div>
+    </form>
+
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <h6 class="mb-0">Bugs ({{ bugs|length }}{% if bugs|length != total %} of {{ total }}{% endif %})</h6>
+      <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('bugs.bugs_demo', project_id=project.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Load demo bugs (28 days)</button></form>
+        {% if total %}<form method="POST" action="{{ url_for('bugs.bugs_clear', project_id=project.id) }}" onsubmit="return confirm('Delete ALL bugs of this project?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i> Delete all</button></form>{% endif %}
+      </div>
+    </div>
+    {% if bugs %}
+    <div class="table-responsive">
+    <table class="table table-sm align-middle sortable">
+      <thead><tr><th data-sort="num">#</th><th data-sort="text">Title</th><th>Description</th><th data-sort="text">Module</th><th data-sort="text">Severity</th><th data-sort="num">CVSS</th><th>OWASP</th><th data-sort="text">Assignee</th><th data-sort="text">Release</th><th data-sort="text">Found</th><th data-sort="text">Reported</th><th data-sort="text">Status</th><th data-sort="num">Reopened</th><th></th></tr></thead>
+      <tbody>
+        {% for b in bugs %}
+        <tr>
+          <td data-v="{{ b.id }}">{{ b.id }}</td>
+          <td><a href="{{ url_for('bugs.bug_edit', project_id=project.id, bug_id=b.id) }}">{{ b.title }}</a></td>
+          <td class="desc-cell small text-muted" title="{{ b.description or '' }}">{{ b.description or '-' }}</td>
+          <td>{{ b.module }}</td>
+          <td><span class="badge badge-{{ b.severity|lower }}">{{ b.severity }}</span></td>
+          <td data-v="{{ b.cvss_score if b.cvss_score is not none else -1 }}">{% if b.cvss_score is not none %}{{ b.cvss_score }} <span class="cvss-badge cvss-{{ b.cvss_score|cvss_band }}">{{ b.cvss_score|cvss_band }}</span>{% else %}-{% endif %}</td>
+          <td class="small">{{ '-' if b.owasp_category in (none, 'None', '') else b.owasp_category }}</td>
+          <td>{{ b.assignee.username if b.assignee else '-' }}</td>
+          <td>
+            {% if b.release %}
+              <a href="{{ url_for('bugs.bug_list', project_id=project.id, release=b.release.id) }}" class="badge bg-secondary text-decoration-none" title="Filter by {{ b.release.name }}">{{ b.release.name }}</a>
+              <a href="{{ url_for('control_chart_page', project_id=project.id, release=b.release.id) }}" class="text-primary ms-1" title="Release Control Chart"><i class="fa-solid fa-chart-line small"></i></a>
+            {% else %}
+              {% if releases %}
+              <form method="POST" action="{{ url_for('bugs.bug_assign_release', project_id=project.id, bug_id=b.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="release_id" class="form-select form-select-sm py-0 px-1 d-inline-block w-auto" style="font-size:0.75rem;" onchange="this.form.submit()">
+                  <option value="">- Assign release -</option>
+                  {% for r in releases %}
+                  <option value="{{ r.id }}">{{ r.name }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+              {% else %}
+                <span class="text-muted small">-</span>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td class="small">{% if b.found_in == 'Production' %}<span class="badge badge-high">Production</span>{% else %}Testing{% endif %}</td>
+          <td class="small text-nowrap" data-v="{{ b.created_at.strftime('%Y-%m-%d') }}">{{ b.created_at.strftime('%d %b %Y') }}</td>
+          <td><span class="badge {{ 'badge-low' if b.status in ('Resolved','Closed') else ('badge-high' if b.status=='Reopened' else 'badge-medium') }}">{{ b.status }}</span></td>
+          <td>{{ b.reopened_count }}</td>
+          <td class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-dark btn-ask-ai" data-bug="{{ b.id }}" data-title="{{ b.title }}" title="Ask AI"><i class="fa-solid fa-robot"></i></button>
+            <a href="{{ url_for('bugs.bug_edit', project_id=project.id, bug_id=b.id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fa-solid fa-pen"></i></a>
+            {% if b.status not in ('Resolved','Closed') %}
+            <form method="POST" action="{{ url_for('bugs.bug_resolve', project_id=project.id, bug_id=b.id) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-success" title="Resolve"><i class="fa-solid fa-check"></i></button></form>
+            {% else %}
+            <form method="POST" action="{{ url_for('bugs.bug_reopen', project_id=project.id, bug_id=b.id) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-warning" title="Reopen"><i class="fa-solid fa-rotate-left"></i></button></form>
+            {% endif %}
+            <form method="POST" action="{{ url_for('bugs.bug_delete', project_id=project.id, bug_id=b.id) }}" class="d-inline" onsubmit="return confirm('Delete this bug?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="fa-solid fa-trash"></i></button></form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% elif total %}
+    <p class="text-muted small mb-0">No bug matches these filters. <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Clear filters</a></p>
+    {% else %}
+    <p class="text-muted small mb-0">No bugs logged yet. Use the form above, or click <b>Load demo bugs</b>.</p>
+    {% endif %}
+  </div>
+</div>
+{% include "_ask_ai_modal.html" %}
+{% endblock %}

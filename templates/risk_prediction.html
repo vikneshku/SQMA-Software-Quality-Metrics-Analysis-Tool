@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Risk Prediction - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Bayesian Risk Prediction</h2>
+  <p>P(Risk | Evidence) computed via Naive Bayes reasoning</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="metric-card text-center">
+        <div class="metric-label">Predicted Risk</div>
+        <div class="metric-value">{{ result.predicted_risk }}</div>
+        <span class="text-muted small">P = {{ result.probabilities[result.predicted_risk] }}</span>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel h-100 mb-0">
+        <h6>Evidence Used</h6>
+        <div class="row text-center">
+          {% for k, v in result.evidence_used.items() %}
+          <div class="col">
+            <div class="fw-bold {{ 'text-danger' if v else 'text-success' }}">{{ 'Yes' if v else 'No' }}</div>
+            <div class="text-muted small">{{ k.replace('_',' ')|title }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        <hr class="my-2">
+        <p class="small text-muted mb-0">Rules: complexity &gt; {{ result.thresholds_used.complexity }} &middot; defect density &gt; {{ result.thresholds_used.defect_density }}/KLOC &middot; any security finding &middot; maintainability &lt; {{ result.thresholds_used.maintainability }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Risk Probabilities  P(Risk | Evidence)</h6>
+    <div class="how-to-read mb-2"><b>How to read:</b> each bar is the probability of that risk level after combining all four pieces of evidence. The three bars add up to 1 (100%); the tallest bar is the predicted risk.</div>
+    <div class="chart-box short" id="bayesChart"></div>
+  </div>
+
+  <div class="panel">
+    <h6>Step-by-step Bayesian Calculation</h6>
+    {% for cls, steps in result.explanation_steps.items() %}
+    <p class="fw-bold mb-1">Risk = {{ cls }}</p>
+    <code class="rules-block">{{ steps|join('\n') }}</code>
+    {% endfor %}
+    <p class="text-muted small mt-2 mb-0"><i class="fa-solid fa-circle-info"></i> {{ result.note }}</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const rc = {'Low':'#16a34a','Medium':'#d97706','High':'#dc2626'};
+const bl = {{ result.probabilities.keys()|list|tojson }};
+SQMA.bars('bayesChart', bl, {{ result.probabilities.values()|list|tojson }},
+  { colors: bl.map(l => rc[l]), max: 1.1, tickMax: 1, yTitle: 'Probability', format: v => (v*100).toFixed(1) + '%', label: 'P(Risk)' });
+</script>
+{% endblock %}

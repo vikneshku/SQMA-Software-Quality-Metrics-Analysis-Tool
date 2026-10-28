@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ cf.relpath or cf.filename }} - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2 class="fs-4">{{ cf.relpath or cf.filename }} <span class="chip chip-{{ risk }}">{{ risk }} risk</span></h2>
+    <p>{{ cf.language }}{% if cf.basic_metrics %} <span class="badge badge-info">basic metrics</span>{% endif %} &middot; {{ (cf.size_bytes / 1024)|round(1) }} KB &middot; {{ size.total_lines }} lines
+      &middot; <a href="{{ url_for('files.files_page', project_id=project.id) }}">all files</a></p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if prev_f %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('files.file_detail', project_id=project.id, file_id=prev_f.id) }}" title="{{ prev_f.relpath or prev_f.filename }}"><i class="fa-solid fa-arrow-left"></i> Previous</a>{% endif %}
+    {% if next_f %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('files.file_detail', project_id=project.id, file_id=next_f.id) }}" title="{{ next_f.relpath or next_f.filename }}">Next <i class="fa-solid fa-arrow-right"></i></a>{% endif %}
+    <form method="POST" action="{{ url_for('files.reanalyze_one', project_id=project.id, file_id=cf.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-rotate"></i> Re-analyse</button></form>
+  </div>
+</div>
+<div class="page-body">
+  {% if cf.parse_error %}<div class="alert alert-warning"><b>Could not fully parse this file:</b> {{ cf.parse_error }}. Line counts are still shown; function metrics may be empty.</div>{% endif %}
+  <div class="row g-3 mb-3">
+    {% set cards = [('Lines', size.total_lines), ('Comments %', ((size.comment_lines / size.total_lines * 100)|round(1)) if size.total_lines else 0),
+        ('Functions', res.functions|length), ('Classes', size.num_classes), ('Imports', size.num_imports),
+        ('Avg complexity', res.avg_complexity), ('Max complexity', res.max_complexity), ('Max nesting', res.structure.max_nesting_depth),
+        ('Maintainability', res.mi.mi_score ~ '%'), ('Quality score', quality.quality_score ~ '%')] %}
+    {% for label, val in cards %}<div class="col-6 col-md-2"><div class="metric-card py-2"><div class="metric-label" style="font-size:.7rem">{{ label }}</div><div class="fs-5 fw-bold">{{ val }}</div></div></div>{% endfor %}
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Band &amp; quality</div><div>{{ res.mi.band }}</div><div class="small text-muted">Quality level: {{ quality.quality_level }}</div></div></div>
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Decision tree prediction</div><div class="fs-5 fw-bold">{{ tree.predicted_risk }}</div><div class="small text-muted">{{ tree.probabilities|tojson }}</div></div></div>
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Bayesian prediction</div><div class="fs-5 fw-bold">{{ bayes.predicted_risk }}</div><div class="small text-muted">P(High) = {{ bayes.probabilities.High }}</div></div></div>
+  </div>
+  {% if not linked_bugs %}<p class="small text-muted"><i class="fa-solid fa-circle-info"></i> No bugs linked to this file, so its defect density is 0 (link bugs when adding/editing them, or use "Log as bug" on an issue below).</p>
+  {% else %}<p class="small text-muted">{{ linked_bugs|length }} bug(s) linked to this file (defect density {{ dd }} per KLOC).</p>{% endif %}
+
+  <div class="panel">
+    <h6>Functions ({{ funcs|length }})</h6>
+    {% if funcs %}
+    <div class="row g-3"><div class="col-lg-6"><div class="table-responsive"><table class="table table-sm sortable">
+      <thead><tr><th data-sort="text">Name</th><th data-sort="num">Line</th><th data-sort="num">Size</th><th data-sort="num">Complexity</th><th data-sort="text">Risk</th></tr></thead><tbody>
+      {% for f in funcs %}<tr><td>{{ f.name }}</td><td><a href="#L{{ f.line }}">{{ f.line }}</a></td><td>{{ f.size_lines }}</td><td>{{ f.complexity }}</td>
+        <td><span class="badge badge-{{ f.risk_level|lower|replace(' ', '-') }}">{{ f.risk_level }}</span></td></tr>{% endfor %}
+      </tbody></table></div></div>
+      <div class="col-lg-6"><div class="chart-box" id="fnChart"></div></div></div>
+    {% else %}<p class="text-muted small mb-0">No functions found in this file.</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h6>Issues in this file ({{ issues|length }})</h6>
+    {% if issues %}
+    <div class="table-responsive"><table class="table table-sm align-middle">
+      <thead><tr><th>Line</th><th>Type</th><th>Severity</th><th>Description</th><th>Suggested fix</th><th></th></tr></thead><tbody>
+      {% for i in issues %}<tr><td><a href="#L{{ i.line_number }}" class="jump" data-line="{{ i.line_number }}">{{ i.line_number }}</a></td><td>{{ i.issue_type }}</td>
+        <td><span class="badge badge-{{ i.severity|lower }}">{{ i.severity }}</span></td><td class="small">{{ i.description }}</td><td class="small">{{ i.fix_suggestion }}</td>
+        <td class="text-nowrap">{% include "_issue_row_button.html" %}</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}<p class="text-muted small mb-0">No issues found in this file.</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h6>Source (read-only) <span class="small text-muted fw-normal">- highlighted lines have issues; click an issue line number above to jump</span></h6>
+    <div class="src-view"><table>
+      {% for line in source_lines %}{% set n = loop.index %}
+      <tr id="L{{ n }}" class="{% if n in by_line %}issue-line sev-{{ by_line[n][0].severity }}{% endif %}" {% if n in by_line %}title="{% for i in by_line[n] %}{{ i.issue_type }}: {{ i.description }}  {% endfor %}"{% endif %}>
+        <td class="ln">{{ n }}</td><td>{{ line }}</td></tr>
+      {% endfor %}
+    </table></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.bars('fnChart', {{ chart.labels|tojson }}, {{ chart.data|tojson }}, { horizontal: true, colors: {{ chart.colors|tojson }}, xTitle: 'Cyclomatic complexity', label: 'Complexity', emptyMsg: 'No functions to chart.' });
+function jumpTo(n) { var r = document.getElementById('L' + n); if (!r) return; r.scrollIntoView({ block: 'center', behavior: 'smooth' }); r.classList.add('flash'); setTimeout(function () { r.classList.remove('flash'); }, 1800); }
+document.querySelectorAll('a.jump').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); jumpTo(a.dataset.line); }); });
+if (location.hash.indexOf('#L') === 0) setTimeout(function () { jumpTo(location.hash.slice(2)); }, 200);
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+{# expects issue i, live_bug_ids, project #}
+{% if i.logged_bug_id and i.logged_bug_id in live_bug_ids %}
+  <a class="btn btn-sm btn-outline-success" href="{{ url_for('bugs.bug_edit', project_id=project.id, bug_id=i.logged_bug_id) }}">Logged as bug #{{ i.logged_bug_id }}</a>
+{% else %}
+  <form method="POST" action="{{ url_for('files.issue_log_bug', project_id=project.id, issue_id=i.id) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-bug"></i> Log as bug</button></form>
+{% endif %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Users - SQMA Tool{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Users</h2><p>People who can log in and be assigned bugs. Only an Admin can add, edit or delete users.</p></div>
+<div class="page-body">
+  {% if current_user.is_admin %}
+  <div class="panel">
+    <h6>Add user</h6>
+    <form method="POST" action="{{ url_for('auth.user_new') }}" class="row g-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-2"><label class="form-label small mb-1">Username</label><input name="username" class="form-control" required pattern="[A-Za-z0-9_.\-]{3,40}"></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Full name</label><input name="full_name" class="form-control" maxlength="120"></div>
+      <div class="col-md-3"><label class="form-label small mb-1">E-mail</label><input type="email" name="email" class="form-control" maxlength="160"></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Role</label>
+        <select name="role" class="form-select">{% for r in roles %}<option {{ 'selected' if r=='Developer' }}>{{ r }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label small mb-1">Password (8+)</label><input type="password" name="password" class="form-control" required minlength="8"></div>
+      <div class="col-md-1"><button class="btn btn-primary w-100">Add</button></div>
+    </form>
+  </div>
+  {% endif %}
+  <div class="panel">
+    <h6>All users ({{ users|length }})</h6>
+    <table class="table table-sm align-middle sortable">
+      <thead><tr><th data-sort="text">Username</th><th data-sort="text">Name</th><th>E-mail</th><th data-sort="text">Role</th><th data-sort="num">Open bugs assigned</th><th></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td><b>{{ u.username }}</b>{% if u.id == current_user.id %} <span class="badge badge-info">you</span>{% endif %}</td>
+          <td>{{ u.full_name or '-' }}</td><td>{{ u.email or '-' }}</td>
+          <td><span class="badge {{ 'badge-critical' if u.role=='Admin' else ('badge-info' if u.role=='Developer' else 'badge-medium') }}">{{ u.role }}</span></td>
+          <td data-v="{{ counts.get(u.id, 0) }}">{{ counts.get(u.id, 0) }}</td>
+          <td class="text-nowrap">
+            {% if current_user.is_admin %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('auth.user_edit', user_id=u.id) }}"><i class="fa-solid fa-pen"></i></a>
+            {% if u.id != current_user.id %}
+            <form method="POST" action="{{ url_for('auth.user_delete', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Delete user {{ u.username }}? Their bugs become unassigned.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button></form>
+            {% endif %}{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

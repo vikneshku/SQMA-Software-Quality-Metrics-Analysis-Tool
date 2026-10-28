@@ -1,0 +1,38 @@
+{# expects rows (from file_service.file_rows) and project #}
+{% if rows %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+  <input type="search" id="fileSearch" class="form-control form-control-sm" style="max-width:300px" placeholder="Search files...">
+  <form method="POST" action="{{ url_for('files.reanalyze_all', project_id=project.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-rotate"></i> Re-analyse all</button></form>
+</div>
+<div class="table-responsive">
+<table class="table table-sm align-middle sortable" id="filesTable">
+  <thead><tr><th data-sort="text">Path</th><th data-sort="text">Language</th><th data-sort="num">Lines</th><th data-sort="num">Functions</th>
+    <th data-sort="num">Avg CC</th><th data-sort="num">Max CC</th><th data-sort="num">Maintainability</th><th data-sort="num">Issues</th><th data-sort="num">Risk</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('files.file_detail', project_id=project.id, file_id=r.id) }}">{{ r.path }}</a></td>
+      <td>{{ r.language }}{% if r.basic %} <span class="badge badge-info" title="Java/JavaScript/C/C++ use basic regex-based metrics">basic</span>{% endif %}</td>
+      <td>{{ r.loc }}</td><td>{{ r.functions }}</td><td>{{ r.avg_cc }}</td><td>{{ r.max_cc }}</td>
+      <td data-v="{{ r.mi }}">{{ r.mi }} <span class="small text-muted">{{ r.band }}</span></td>
+      <td>{{ r.issues }}</td>
+      <td data-v="{{ {'Low':0,'Medium':1,'High':2,'Critical':3}[r.risk] }}"><span class="chip chip-{{ r.risk }}">{{ r.risk }}</span></td>
+      <td class="text-nowrap">
+        <form method="POST" action="{{ url_for('files.reanalyze_one', project_id=project.id, file_id=r.id) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary" title="Re-analyse"><i class="fa-solid fa-rotate"></i></button></form>
+        <form method="POST" action="{{ url_for('files.delete_file', project_id=project.id, file_id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete this file?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger" title="Delete"><i class="fa-solid fa-trash"></i></button></form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<script>
+document.getElementById('fileSearch').addEventListener('input', function () {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('#filesTable tbody tr').forEach(function (tr) { tr.style.display = tr.textContent.toLowerCase().indexOf(q) < 0 ? 'none' : ''; });
+});
+</script>
+{% else %}
+<div class="chart-empty"><i class="fa-solid fa-file-code"></i><span><b>No source files yet.</b><br>Upload a project folder or files on the Source Code Upload page.</span>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Go to upload</a></div>
+{% endif %}

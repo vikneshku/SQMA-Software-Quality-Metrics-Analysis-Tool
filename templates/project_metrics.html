@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Project Metrics - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Project Metrics</h2><p>Totals, a per-file table with every metric, and a comparison between sub-folders</p></div>
+<div class="page-body">
+  {% if not rows %}
+  <div class="panel"><div class="chart-empty"><i class="fa-solid fa-file-code"></i><span><b>Upload your source code first</b> - this page needs code metrics to work.</span>
+    <a class="btn btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Go to Source Code Upload</a></div></div>
+  {% else %}
+  <h5>1. Project totals</h5>
+  <div class="row g-3 mb-3">
+    {% set cards = [('Files', analysis.size.num_files), ('Lines of code', analysis.size.total_loc), ('Comments %', analysis.size.comment_ratio_percent),
+      ('Functions', analysis.size.num_functions), ('Classes', analysis.size.num_classes), ('Avg complexity', analysis.avg_complexity),
+      ('Max complexity', analysis.max_complexity), ('Maintainability', mi.mi_score ~ '%'), ('Quality', quality.quality_score ~ '% ' ~ quality.quality_level),
+      ('High issues', issue_counts.High), ('Medium issues', issue_counts.Medium), ('Low issues', issue_counts.Low)] %}
+    {% for label, val in cards %}<div class="col-6 col-md-2"><div class="metric-card py-2"><div class="metric-label" style="font-size:.7rem">{{ label }}</div><div class="fs-5 fw-bold">{{ val }}</div></div></div>{% endfor %}
+  </div>
+
+  <h5>2. Per-file metrics</h5>
+  <div class="panel"><div class="table-responsive"><table class="table table-sm align-middle sortable">
+    <thead><tr><th data-sort="text">File</th><th data-sort="text">Lang</th><th data-sort="num">LOC</th><th data-sort="num">Comments</th><th data-sort="num">Functions</th><th data-sort="num">Classes</th>
+      <th data-sort="num">Avg CC</th><th data-sort="num">Max CC</th><th data-sort="num">MI</th><th data-sort="num">Issues</th><th data-sort="num">Risk</th></tr></thead><tbody>
+    {% for r in rows %}<tr><td><a href="{{ url_for('files.file_detail', project_id=project.id, file_id=r.id) }}">{{ r.path }}</a></td><td>{{ r.language }}{% if r.basic %}*{% endif %}</td>
+      <td>{{ r.loc }}</td><td>{{ r.comment_lines }}</td><td>{{ r.functions }}</td><td>{{ r.classes }}</td><td>{{ r.avg_cc }}</td><td>{{ r.max_cc }}</td><td>{{ r.mi }}</td><td>{{ r.issues }}</td>
+      <td data-v="{{ {'Low':0,'Medium':1,'High':2,'Critical':3}[r.risk] }}"><span class="chip chip-{{ r.risk }}">{{ r.risk }}</span></td></tr>{% endfor %}
+    </tbody></table></div><p class="small text-muted mb-0">* basic metrics (Java / JavaScript / C / C++).</p></div>
+
+  <div class="d-flex justify-content-between align-items-center"><h5>3. Sub-folder comparison</h5>
+    <div class="btn-group"><a class="btn btn-sm {{ 'btn-primary' if depth==1 else 'btn-outline-primary' }}" href="?depth=1">1 level</a>
+      <a class="btn btn-sm {{ 'btn-primary' if depth==2 else 'btn-outline-primary' }}" href="?depth=2">2 levels</a></div></div>
+  <div class="panel">
+    <div class="chart-box" id="folderChart"></div>
+    <div class="table-responsive mt-3"><table class="table table-sm sortable">
+      <thead><tr><th data-sort="text">Sub-folder</th><th data-sort="num">Files</th><th data-sort="num">LOC</th><th data-sort="num">Avg complexity</th><th data-sort="num">Maintainability</th><th data-sort="num">Issues</th><th data-sort="num">Worst risk</th></tr></thead><tbody>
+      {% for g in groups %}<tr><td>{{ g.name }}</td><td>{{ g.files }}</td><td>{{ g.loc }}</td><td>{{ g.avg_cc }}</td><td>{{ g.mi }}</td><td>{{ g.issues }}</td>
+        <td data-v="{{ {'Low':0,'Medium':1,'High':2,'Critical':3}[g.risk] }}"><span class="chip chip-{{ g.risk }}">{{ g.risk }}</span></td></tr>{% endfor %}
+      </tbody></table></div>
+    <p class="small text-muted mb-0">Files directly in the project root are grouped as "(root)".</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{% if rows %}<script>SQMA.folderComparison('folderChart', {{ chart|tojson }});</script>{% endif %}{% endblock %}

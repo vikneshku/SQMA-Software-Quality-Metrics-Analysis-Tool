@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Correlation Analysis - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Correlation Analysis</h2>
+  <p>Pearson correlation between function size and complexity</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Pearson r</div><div class="metric-value">{{ result.r }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Strength</div><div class="metric-value" style="font-size:1.4rem">{{ result.strength }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Direction</div><div class="metric-value" style="font-size:1.4rem;text-transform:capitalize">{{ result.kind }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Functions compared</div><div class="metric-value">{{ result.n }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <h6><i class="fa-solid fa-comment-dots"></i> What the result means</h6>
+    <p class="mb-0">{{ result.interpretation }}</p>
+  </div>
+
+  <div class="panel">
+    <h6>Where your project falls (reference diagram)</h6>
+    <div class="how-to-read mb-2">
+      <b>How to read:</b> dots rising from bottom-left to top-right = <b>positive</b> correlation; a shapeless cloud = <b>zero</b> correlation; dots falling from top-left to bottom-right = <b>negative</b> correlation.
+      The green-highlighted panel is the one that matches your data (|r| below 0.2 is treated as zero).
+    </div>
+    <div id="corrRef"></div>
+  </div>
+
+  <div class="panel">
+    <h6>Your data: function size vs cyclomatic complexity (scatter plot)</h6>
+    <div class="chart-box tall" id="scatterChart"></div>
+    {% if result.trend %}
+    <p class="small text-muted mt-2 mb-0">Dashed red line = least-squares trend line: complexity = {{ result.slope }} &times; size + ({{ result.intercept }}); r&sup2; = {{ result.r_squared }}
+      (about {{ (result.r_squared * 100)|round(1) }}% of the change in complexity is explained by function size).</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h6>Rule and working</h6>
+    <table class="table table-sm mb-2">
+      <tr><th>Formula</th><td>r = &Sigma;(x &minus; x&#772;)(y &minus; &#563;) / &radic;[ &Sigma;(x &minus; x&#772;)&sup2; &middot; &Sigma;(y &minus; &#563;)&sup2; ]</td></tr>
+      <tr><th>Strength rule</th><td>|r| &ge; 0.7 strong &nbsp;|&nbsp; 0.4 - 0.69 moderate &nbsp;|&nbsp; 0.2 - 0.39 weak &nbsp;|&nbsp; below 0.2 negligible</td></tr>
+      <tr><th>Code</th><td><code>stats_engine/correlation.py &rarr; pearson_correlation()</code></td></tr>
+    </table>
+    <p class="small text-muted mb-0">Correlation shows that two measures move together; it does not prove that one causes the other.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.correlationRef('corrRef', {{ result.kind|tojson }});
+SQMA.scatter('scatterChart', {{ points|tojson }}, {{ (result.trend or none)|tojson }}, 'Function size (lines of code)', 'Cyclomatic complexity');
+</script>
+{% endblock %}

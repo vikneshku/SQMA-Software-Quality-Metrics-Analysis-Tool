@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Register - SQMA Tool{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="panel">
+    <h5 class="mb-1">Create an account</h5>
+    <p class="text-muted small">{% if first %}You are the first user, so you will become the <b>Admin</b>.{% else %}New accounts start as <b>Developer</b>; an Admin can change the role later.{% endif %}</p>
+    <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-2"><label class="form-label">Username</label><input name="username" class="form-control" required pattern="[A-Za-z0-9_.\-]{3,40}" title="3-40 letters, digits, dot, dash or underscore"></div>
+      <div class="mb-2"><label class="form-label">Full name</label><input name="full_name" class="form-control" maxlength="120"></div>
+      <div class="mb-2"><label class="form-label">E-mail</label><input type="email" name="email" class="form-control" maxlength="160"></div>
+      <div class="mb-2"><label class="form-label">Password (8+ characters)</label><input type="password" name="password" class="form-control" required minlength="8" autocomplete="new-password"></div>
+      <div class="mb-3"><label class="form-label">Repeat password</label><input type="password" name="password2" class="form-control" required minlength="8" autocomplete="new-password"></div>
+      <button class="btn btn-primary w-100">Create account</button>
+    </form>
+    <hr><p class="small mb-0">Already registered? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+  </div>
+</div>
+{% endblock %}

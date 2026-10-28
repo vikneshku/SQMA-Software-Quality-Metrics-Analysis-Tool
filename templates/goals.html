@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Goals (GQM) - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2><i class="fa-solid fa-bullseye text-primary me-2"></i>Goal-Based Measurement (GQM)</h2>
+    <p class="mb-0 text-muted">Goal &rarr; Question &rarr; Metric framework connecting project objectives to operational quality measurements.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('control_chart_page', project_id=project.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="fa-solid fa-chart-line me-1"></i> Control Chart
+    </a>
+    <a href="{{ url_for('bugs.releases', project_id=project.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="fa-solid fa-tags me-1"></i> Releases
+    </a>
+    <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="fa-solid fa-bug me-1"></i> Bugs ({{ bug_count }})
+    </a>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="row g-3">
+    {% for g in gqm %}
+    <div class="col-lg-4 col-md-6">
+      <div class="panel h-100 d-flex flex-column shadow-sm border-0">
+        <!-- Goal Header -->
+        <div class="d-flex align-items-center mb-2 pb-2 border-bottom">
+          <div class="me-2 rounded-circle p-2 bg-primary bg-opacity-10 text-primary">
+            <i class="fa-solid {{ g.icon|default('fa-bullseye') }} fa-lg"></i>
+          </div>
+          <div>
+            <span class="badge bg-primary text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">Goal</span>
+            <h5 class="mb-0 fw-bold text-dark mt-1">{{ g.goal }}</h5>
+          </div>
+        </div>
+
+        <!-- Question -->
+        <div class="mb-3 p-2 rounded bg-light border-start border-3 border-primary">
+          <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.7rem;">
+            <i class="fa-solid fa-circle-question text-primary me-1"></i> Question
+          </div>
+          <div class="fst-italic text-dark mt-1">{{ g.question }}</div>
+        </div>
+
+        {% if g.summary %}
+        <div class="small text-secondary mb-3">
+          <i class="fa-solid fa-info-circle me-1"></i> {{ g.summary }}
+        </div>
+        {% endif %}
+
+        <!-- Metrics Table -->
+        <div class="mt-auto">
+          <div class="text-uppercase text-muted fw-bold small mb-2" style="font-size: 0.72rem;">
+            <i class="fa-solid fa-ruler me-1"></i> Concrete Metrics &amp; Targets
+          </div>
+          <div class="list-group list-group-flush rounded border">
+            {% for m in g.metrics %}
+            <div class="list-group-item p-2">
+              <div class="d-flex justify-content-between align-items-center">
+                <a href="{{ m.url }}" class="fw-semibold text-decoration-none text-primary" title="Drill down to {{ m.name }}">
+                  {{ m.name }} <i class="fa-solid fa-arrow-up-right-from-square small ms-1 text-muted" style="font-size: 0.7rem;"></i>
+                </a>
+                <span class="badge bg-{{ m.status|default('secondary') }} text-uppercase" style="font-size: 0.65rem;">
+                  {% if m.status == 'success' %}Pass{% elif m.status == 'warning' %}Warning{% elif m.status == 'danger' %}Attention{% else %}Info{% endif %}
+                </span>
+              </div>
+              <div class="d-flex justify-content-between align-items-baseline mt-1">
+                <span class="text-muted small" style="font-size: 0.75rem;">
+                  <i class="fa-solid fa-crosshairs me-1 text-secondary"></i> {{ m.target }}
+                </span>
+                <span class="fw-bold text-dark" style="font-size: 0.88rem;">
+                  {{ m.value }} <span class="text-muted small fw-normal">{{ m.unit }}</span>
+                </span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel mt-3 bg-light">
+    <div class="d-flex align-items-center">
+      <i class="fa-solid fa-diagram-project fa-2x text-primary me-3"></i>
+      <div>
+        <h6 class="mb-1 fw-bold">Goal &rarr; Question &rarr; Metric (GQM) Traceability</h6>
+        <p class="text-muted small mb-0">
+          The GQM framework connects strategic software engineering goals to measurable analytical questions, and each question to concrete metrics computed in real-time across this tool (Control Chart, Releases, Bug Management, Complexity, and Security). Click on any metric title to inspect its underlying data and source breakdown.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

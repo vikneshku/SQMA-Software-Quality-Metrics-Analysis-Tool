@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Edit bug #{{ bug.id }} - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Edit bug #{{ bug.id }}</h2>
+  <p>{{ project.name }} &middot; <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}">back to Bug Management</a></p></div>
+<div class="page-body">
+  <div class="panel">
+    <form method="POST" class="row g-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% include "_bug_fields.html" %}
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save changes</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Cancel</a>
+        <button type="button" class="btn btn-outline-dark btn-ask-ai ms-auto" data-bug="{{ bug.id }}" data-title="{{ bug.title }}"><i class="fa-solid fa-robot"></i> Ask AI</button>
+      </div>
+    </form>
+    <hr>
+    <p class="small text-muted mb-0"><i class="fa-solid fa-clock-rotate-left"></i>
+      Created {{ bug.created_at.strftime('%d %b %Y %H:%M') }} &middot;
+      Last updated {{ bug.updated_at.strftime('%d %b %Y %H:%M') if bug.updated_at else '-' }}
+      {% if bug.resolved_at %}&middot; Resolved {{ bug.resolved_at.strftime('%d %b %Y %H:%M') }}{% endif %}
+      &middot; Reopened {{ bug.reopened_count }} time(s)</p>
+    <p class="small text-muted mb-0 mt-1">Moving a bug to Resolved/Closed sets the resolved date; moving it back to an open status clears it; choosing Reopened adds 1 to the reopen count.</p>
+  </div>
+  {% if bug.code_file %}<div class="panel small"><i class="fa-solid fa-file-code"></i> Linked file: <a href="{{ url_for('files.file_detail', project_id=project.id, file_id=bug.code_file.id) }}">{{ bug.code_file.relpath or bug.code_file.filename }}</a></div>{% endif %}
+  <div class="panel">
+    <h6><i class="fa-solid fa-comments"></i> Comments ({{ bug.comments|length }})</h6>
+    {% for c in bug.comments %}<div class="border rounded p-2 mb-2 small"><b>{{ 'AI' if c.source == 'ai' else (c.user.username if c.user else 'user') }}</b> <span class="text-muted">{{ c.created_at.strftime('%d %b %Y %H:%M') }}</span><div style="white-space:pre-wrap">{{ c.text }}</div></div>
+    {% else %}<p class="text-muted small mb-0">No comments yet. Use <b>Ask AI</b> and "Save as comment" to keep a suggestion here.</p>{% endfor %}
+  </div>
+</div>
+{% include "_ask_ai_modal.html" %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Projects - SQMA Tool{% endblock %}
+{% block content %}
+<div class="landing-hero text-center">
+  <h1><i class="fa-solid fa-chart-line"></i> Software Quality & Metrics Analysis Tool</h1>
+  <p class="lead mb-0">Collect data → Calculate metrics → Analyze statistically → Predict risk → Assess quality → Report</p>
+</div>
+
+<div class="container py-5">
+  <div class="row mb-4">
+    <div class="col-lg-6 mx-auto">
+      <div class="panel">
+        <h5 class="mb-3"><i class="fa-solid fa-plus"></i> Create New Project</h5>
+        <form method="POST" action="{{ url_for('create_project') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Project Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Inventory Management System" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description (optional)</label>
+            <textarea name="description" class="form-control" rows="2" placeholder="Short description..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Create Project</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <h5 class="mb-3">Your Projects</h5>
+  {% if projects %}
+  <div class="row g-3">
+    {% for p in projects %}
+    <div class="col-md-4">
+      <div class="project-card">
+        <h6 class="fw-bold">{{ p.name }}</h6>
+        <p class="text-muted small mb-2">{{ p.description or "No description" }}</p>
+        <p class="text-muted small">Created {{ p.created_at.strftime('%Y-%m-%d') }}</p>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('dashboard', project_id=p.id) }}" class="btn btn-sm btn-primary flex-fill">Open</a>
+          <form method="POST" action="{{ url_for('delete_project', project_id=p.id) }}" onsubmit="return confirm('Delete this project and all its data?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted">No projects yet — create one above to get started.</p>
+  {% endif %}
+</div>
+{% endblock %}

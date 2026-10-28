@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Decision Tree - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Decision Tree - Risk Classification</h2>
+  <p>Explainable classifier using LOC, complexity, defect density, reopen rate, security issues</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="metric-card text-center">
+        <div class="metric-label">Predicted Risk</div>
+        <div class="metric-value">{{ result.predicted_risk }}</div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel h-100 mb-0">
+        <h6>Input Features (this project)</h6>
+        <div class="row text-center">
+          <div class="col"><div class="fw-bold">{{ inputs.loc }}</div><div class="text-muted small">LOC</div></div>
+          <div class="col"><div class="fw-bold">{{ inputs.complexity }}</div><div class="text-muted small">Complexity</div></div>
+          <div class="col"><div class="fw-bold">{{ inputs.defect_density }}</div><div class="text-muted small">Defect Density</div></div>
+          <div class="col"><div class="fw-bold">{{ inputs.reopen_rate }}</div><div class="text-muted small">Reopen Rate</div></div>
+          <div class="col"><div class="fw-bold">{{ inputs.security_issues }}</div><div class="text-muted small">Security Issues</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Decision Tree diagram</h6>
+    <div class="how-to-read">
+      <b>A decision tree is a flowchart-like model</b> used for classification. It splits the data by asking a yes/no question about one feature at each <b>decision node</b>, starting at the <b>root node</b>,
+      until it reaches a <b>leaf node</b> that gives the answer (the risk class). <span style="color:#c2410c"><b>The orange path</b></span> is the route <b>your project</b> followed.
+      <b>Yes</b> = the condition is true (left branch), <b>No</b> = false (right branch).
+    </div>
+    <div class="legend-row">
+      <span><span class="sq" style="background:#b7dfae;border:1px solid #6aa66a;height:12px"></span>Root / decision node</span>
+      <span><span class="dot" style="background:#16a34a"></span>Leaf: Low risk</span>
+      <span><span class="dot" style="background:#d97706"></span>Leaf: Medium risk</span>
+      <span><span class="dot" style="background:#dc2626"></span>Leaf: High risk</span>
+      <span><span class="sq" style="border-top:3px solid #f97316;height:0;width:18px"></span>Path taken</span>
+    </div>
+    <div id="treeDiagram" class="chart-box auto"></div>
+    <div class="mt-3">
+      <b>Your project's path:</b>
+      <ol class="mb-0 small">
+        {% for st in result.path_steps %}<li><code>{{ st.text }}</code> - your value is <b>{{ st.value }}</b> &rarr; <b>{{ st.answer }}</b></li>{% endfor %}
+        <li>Reached a leaf node: <b>{{ result.predicted_risk }} risk</b></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Class Probabilities</h6>
+        <div class="chart-box short" id="probChart"></div>
+        <p class="small text-muted mt-2 mb-0">Share of the training samples in the reached leaf that belong to each class.</p>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="panel">
+        <h6>Feature Importance</h6>
+        <div class="chart-box short" id="impChart"></div>
+        <p class="small text-muted mt-2 mb-0">How much each input contributed to the tree's splits (the values add up to 1).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h6>Tree Rules (explainable, text form)</h6>
+    <code class="rules-block">{{ result.tree_rules }}</code>
+    <p class="text-muted small mt-2 mb-0"><i class="fa-solid fa-circle-info"></i> {{ result.note }}</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const classColors = {'Low':'#16a34a','Medium':'#d97706','High':'#dc2626'};
+const probLabels = {{ result.probabilities.keys()|list|tojson }};
+SQMA.treeDiagram('treeDiagram', {{ result.tree_structure|tojson }}, {{ result.path_ids|tojson }});
+SQMA.bars('probChart', probLabels, {{ result.probabilities.values()|list|tojson }},
+  { colors: probLabels.map(l => classColors[l]), max: 1.1, tickMax: 1, yTitle: 'Probability', format: v => (v*100).toFixed(1) + '%' , label: 'Probability'});
+SQMA.bars('impChart', {{ result.feature_importances.keys()|list|tojson }}, {{ result.feature_importances.values()|list|tojson }},
+  { horizontal: true, colors: {{ result.feature_importances.keys()|list|tojson }}.map(() => '#1c7293'), max: 1, xTitle: 'Importance', format: v => v.toFixed(3), label: 'Importance' });
+</script>
+{% endblock %}

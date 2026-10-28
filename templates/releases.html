@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Releases - {{ project.name }}{% endblock %}
+{% macro light(color) %}<span class="ready-light ready-{{ color }}" title="{{ color }}"></span>{% endmacro %}
+{% block content %}
+<div class="page-header"><h2>Releases</h2>
+  <p>Group bugs by release, compare releases and see whether each one is ready to ship.</p></div>
+<div class="page-body">
+  {% if latest %}
+  <div class="panel d-flex align-items-center gap-3">
+    <span class="ready-light big ready-{{ latest.readiness.color }}"></span>
+    <div><div class="text-muted small text-uppercase">Latest release readiness</div>
+      <div class="fs-5 fw-bold ready-text-{{ latest.readiness.color }}">{{ latest.name }} is {{ latest.readiness.color|upper }}</div>
+      <div class="small">{{ latest.readiness.reasons|join('; ') }}</div></div>
+  </div>
+  {% endif %}
+  {% if unassigned_count and unassigned_count > 0 %}
+  <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <i class="fa-solid fa-circle-exclamation"></i> <b>{{ unassigned_count }} bug(s)</b> are currently not assigned to any release.
+      Bugs without a release are excluded from release readiness calculations.
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('bugs.bug_list', project_id=project.id, release='none') }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-bug"></i> View unassigned</a>
+      {% if rows %}
+      <form method="POST" action="{{ url_for('bugs.assign_unassigned', project_id=project.id) }}" class="d-inline-flex gap-1 align-items-center">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select name="target_release_id" class="form-select form-select-sm" style="max-width:180px;">
+          {% for r in rows %}<option value="{{ r.id }}">Assign to {{ r.name }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary">Assign All</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <h6>Add release</h6>
+    <form method="POST" class="row g-2 align-items-end"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-4"><label class="form-label small mb-1">Name (e.g. v1.0)</label><input name="name" class="form-control" required maxlength="60"></div>
+      <div class="col-md-3"><label class="form-label small mb-1">Release date</label><input type="date" name="release_date" class="form-control"></div>
+      <div class="col-md-3"><label class="form-label small mb-1">Status</label><select name="status" class="form-select">{% for s in statuses %}<option>{{ s }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><button class="btn btn-primary w-100"><i class="fa-solid fa-plus"></i> Add</button></div>
+    </form>
+  </div>
+  <div class="panel">
+    <h6>All releases ({{ rows|length }})</h6>
+    {% if rows %}
+    <div class="table-responsive"><table class="table table-sm align-middle sortable">
+      <thead><tr><th>Ready?</th><th data-sort="text">Release</th><th data-sort="text">Date</th><th data-sort="text">Status</th><th data-sort="num">Total bugs</th><th data-sort="num">Open</th><th data-sort="num">Closed</th><th data-sort="num">Critical/High</th><th data-sort="num">Escaped</th><th data-sort="num">Escape rate</th><th>Reasons</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>{{ light(r.readiness.color) }} <span class="small ready-text-{{ r.readiness.color }} fw-bold">{{ r.readiness.color }}</span></td>
+          <td><a href="{{ url_for('bugs.bug_list', project_id=project.id, release=r.id) }}" class="fw-bold">{{ r.name }}</a></td>
+          <td>{{ r.date.strftime('%d %b %Y') if r.date else '-' }}</td><td>{{ r.status }}</td>
+          <td><a href="{{ url_for('bugs.bug_list', project_id=project.id, release=r.id) }}">{{ r.total }}</a></td><td>{{ r.open }}</td><td>{{ r.closed }}</td><td>{{ r.critical_high }}</td><td>{{ r.escaped }}</td><td data-v="{{ r.escape_rate }}">{{ r.escape_rate }}%</td>
+          <td class="small">{{ r.readiness.reasons|join('; ') }}</td>
+          <td class="text-nowrap">
+            <a class="btn btn-sm btn-outline-info" href="{{ url_for('control_chart_page', project_id=project.id, release=r.id) }}" title="View Control Chart for {{ r.name }}"><i class="fa-solid fa-chart-line"></i> Chart</a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('bugs.release_edit', project_id=project.id, release_id=r.id) }}"><i class="fa-solid fa-pen"></i></a>
+            <form method="POST" action="{{ url_for('bugs.release_delete', project_id=project.id, release_id=r.id) }}" class="d-inline" onsubmit="return confirm('Delete release {{ r.name }}? Its bugs are kept but un-tagged.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></button></form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% else %}
+    <p class="text-muted small mb-0">No releases yet. Add one above, or load demo bugs in <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Bug Management</a> (it creates v1.0, v1.1 and v1.2).</p>
+    {% endif %}
+    <p class="small text-muted mt-3 mb-0"><b>Readiness rules:</b> RED = any open Critical bug, or 3+ open High bugs, or an open security bug with CVSS &ge; 9. YELLOW = any open High bug, or more open than closed bugs, or an open bug older than 30 days. GREEN = none of these.</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{# Include once per page. Buttons: <button class="btn-ask-ai" data-bug="ID" data-title="...">. #}
+<div class="modal fade" id="askAiModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="fa-solid fa-robot"></i> Ask AI: <span id="askAiTitle"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><div id="askAiBody" class="ai-answer">Thinking...</div></div>
+    <div class="modal-footer"><span class="small text-muted me-auto" id="askAiNote"></span>
+      <button class="btn btn-success btn-sm" id="askAiSave" disabled><i class="fa-solid fa-comment-medical"></i> Save as comment</button>
+      <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
+  </div></div>
+</div>
+<script>
+(function () {
+  var base = {{ url_for('index')|tojson }}.replace(/\/$/, '') + '/project/{{ project.id }}/bugs/';
+  var modal, current = null, answer = '';
+  function el(id) { return document.getElementById(id); }
+  document.querySelectorAll('.btn-ask-ai').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      current = btn.dataset.bug; answer = '';
+      el('askAiTitle').textContent = btn.dataset.title; el('askAiBody').textContent = 'Thinking...'; el('askAiNote').textContent = '';
+      el('askAiSave').disabled = true;
+      modal = modal || new bootstrap.Modal(el('askAiModal')); modal.show();
+      var r = await SQMA_AI.post(base + current + '/ask-ai', {});
+      if (r.ok) { answer = r.answer; SQMA_AI.render(el('askAiBody'), r.answer); el('askAiSave').disabled = false; }
+      else { el('askAiBody').textContent = r.message || 'The AI could not answer.'; }
+    });
+  });
+  el('askAiSave').addEventListener('click', async function () {
+    var r = await SQMA_AI.post(base + current + '/comments', { text: 'AI suggestion:\n' + answer, source: 'ai' });
+    el('askAiNote').textContent = r.ok ? 'Saved as a comment on the bug.' : (r.message || 'Could not save.');
+    if (r.ok) { el('askAiSave').disabled = true; if (location.pathname.indexOf('/edit') > 0) setTimeout(function () { location.reload(); }, 700); }
+  });
+})();
+</script>

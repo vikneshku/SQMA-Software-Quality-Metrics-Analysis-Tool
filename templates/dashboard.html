@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+  <div>
+    <h2>Home Dashboard</h2>
+    <p>{{ project.name }} — combined quality overview</p>
+  </div>
+  <a href="{{ url_for('report_page', project_id=project.id) }}" class="btn btn-primary"><i class="fa-solid fa-file-lines"></i> View Full Report</a>
+</div>
+
+<div class="page-body">
+  <div class="verdict-banner alert alert-{{ verdict_colour }} mb-3">{{ verdict }}</div>
+
+  {% if not analysis.has_code %}
+  <div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span><i class="fa-solid fa-file-code"></i> No source code yet - quality, risk and maintainability need code metrics.</span>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Upload code</a></div>
+  {% endif %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Quality Score</div>
+      <div class="metric-value">{{ quality.quality_score }}%</div>
+      <span class="badge badge-{{ quality.quality_level|lower|replace(' ', '-') }}">{{ quality.quality_level }}</span></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Predicted Risk</div>
+      <div class="metric-value">{{ risk.predicted_risk }}</div>
+      <span class="text-muted small">P={{ risk.probabilities[risk.predicted_risk] }}</span></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Total Defects</div>
+      <div class="metric-value">{{ bugs|length }}</div>
+      <span class="text-muted small">Density: {{ defect_density_value }}/KLOC</span></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Maintainability</div>
+      <div class="metric-value">{{ maintainability.mi_score }}%</div>
+      <span class="text-muted small">{{ maintainability.band }}</span></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Total LOC</div><div class="metric-value">{{ analysis.size.total_loc }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Avg Complexity</div><div class="metric-value">{{ analysis.avg_complexity }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Files Analyzed</div><div class="metric-value">{{ analysis.size.num_files }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Security Issues (code)</div><div class="metric-value">{{ analysis.security_findings|length }}</div>
+      <span class="text-muted small">{{ analysis.security_counts.High }} High / {{ analysis.security_counts.Medium }} Med</span></div></div>
+  </div>
+
+  <!-- ===== bug health cards (requirements 7, 8, 9, 15) ===== -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Open : Closed</div>
+      <div class="metric-value">{{ s.open_closed.ratio_text }}</div>
+      <span class="text-muted small">{{ s.open_closed.percent_open }}% open</span>
+      <div id="ocBar"></div></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Avg age of open bugs</div>
+      <div class="metric-value">{{ s.avg_open_age_days }}<small class="fs-6"> days</small></div>
+      <span class="small {{ 'text-danger fw-bold' if s.old_bug_count else 'text-muted' }}">{{ s.old_bug_count }} bug(s) older than {{ aging_days }} days</span></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Escape rate</div>
+      <div class="metric-value">{{ s.escape_rate }}%</div>
+      <span class="text-muted small">{{ s.escaped_count }} of {{ bugs|length }} bugs found in Production</span></div></div>
+    <div class="col-md-3"><div class="metric-card">
+      <div class="metric-label">Release readiness</div>
+      {% if s.latest_release %}
+      <div class="d-flex align-items-center gap-2"><span class="ready-light big ready-{{ s.latest_release.readiness.color }}"></span>
+        <div><div class="fw-bold ready-text-{{ s.latest_release.readiness.color }}">{{ s.latest_release.readiness.color|upper }}</div><div class="small text-muted">{{ s.latest_release.name }}</div></div></div>
+      <ul class="small mb-0 mt-2 ps-3">{% for r in s.latest_release.readiness.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+      {% else %}
+      <div class="text-muted small mt-2">No release yet. <a href="{{ url_for('bugs.releases', project_id=project.id) }}">Add a release</a>.</div>
+      {% endif %}</div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6"><div class="panel"><h6>Defect Severity Breakdown</h6><div class="chart-box short" id="severityChart"></div></div></div>
+    <div class="col-md-6"><div class="panel"><h6>Quality Score Components</h6><div class="chart-box short" id="componentsChart"></div></div></div>
+  </div>
+
+
+  <!-- ===== riskiest files + sub-folder comparison (requirement 36) ===== -->
+  <div class="row g-3">
+    <div class="col-lg-7"><div class="panel">
+      <h6><i class="fa-solid fa-fire"></i> 10 riskiest files <a class="small fw-normal ms-2" href="{{ url_for('files.files_page', project_id=project.id) }}">all files</a></h6>
+      {% if riskiest %}
+      <table class="table table-sm align-middle"><thead><tr><th>File</th><th>Risk</th><th>MI</th><th>Avg CC</th><th>Issues</th></tr></thead><tbody>
+      {% for r in riskiest %}<tr><td><a href="{{ url_for('files.file_detail', project_id=project.id, file_id=r.id) }}">{{ r.path }}</a></td>
+        <td><span class="chip chip-{{ r.risk }}">{{ r.risk }}</span></td><td>{{ r.mi }}</td><td>{{ r.avg_cc }}</td><td>{{ r.issues }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="text-muted small mb-0">No files yet. <a href="{{ url_for('upload_source', project_id=project.id) }}">Upload a project folder</a>.</p>{% endif %}
+    </div></div>
+    <div class="col-lg-5"><div class="panel">
+      <h6><i class="fa-solid fa-folder-tree"></i> Sub-folder comparison <a class="small fw-normal ms-2" href="{{ url_for('files.project_metrics_page', project_id=project.id) }}">details</a></h6>
+      <div class="chart-box short" id="folderChart"></div>
+    </div></div>
+  </div>
+
+  <!-- ===== release comparison (requirement 10) ===== -->
+  <div class="panel">
+    <div class="d-flex justify-content-between"><h6>Release-wise comparison</h6><a class="small" href="{{ url_for('bugs.releases', project_id=project.id) }}">Manage releases</a></div>
+    <div class="row g-3">
+      <div class="col-lg-8"><div class="chart-box" id="releaseChart"></div></div>
+      <div class="col-lg-4">
+        {% if s.release_rows %}
+        <table class="table table-sm"><thead><tr><th>Release</th><th>Escape rate</th><th>Ready</th></tr></thead><tbody>
+          {% for r in s.release_rows %}<tr><td>{{ r.name }}</td><td>{{ r.escape_rate }}% <span class="text-muted small">({{ r.escaped }}/{{ r.total }})</span></td>
+            <td><span class="ready-light ready-{{ r.readiness.color }}" title="{{ r.readiness.color }}"></span></td></tr>{% endfor %}
+        </tbody></table>
+        {% else %}<p class="text-muted small">No releases yet - escape rate per release will appear here.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== module-wise bug and risk table (requirement 11) ===== -->
+  <div class="panel">
+    <h6><i class="fa-solid fa-diagram-project"></i> Module-wise bugs and risk <span class="text-muted small fw-normal">(click a column header to sort)</span></h6>
+    {% if s.modules %}
+    <div class="table-responsive"><table class="table table-sm align-middle sortable">
+      <thead><tr><th data-sort="text">Module</th><th data-sort="num">Total bugs</th><th data-sort="num">Open</th><th data-sort="num">Critical</th><th data-sort="num">High</th><th data-sort="num">Avg CVSS</th><th data-sort="num">Risk score</th><th data-sort="num">Risk</th></tr></thead>
+      <tbody>
+      {% for m, d in s.modules.items() %}
+        <tr><td>{{ m }}</td><td>{{ d.bug_count }}</td><td>{{ d.open_count }}</td><td>{{ d.critical }}</td><td>{{ d.high }}</td>
+          <td data-v="{{ d.avg_cvss if d.avg_cvss is not none else -1 }}">{{ d.avg_cvss if d.avg_cvss is not none else '-' }}</td>
+          <td>{{ d.risk_score }}</td>
+          <td data-v="{{ d.risk_score }}"><span class="badge badge-{{ d.risk_level|lower }}">{{ d.risk_level }}</span></td></tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% else %}
+    <p class="text-muted small mb-0">No bugs logged yet. <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Add bugs</a> to see module risk.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h6><i class="fa-solid fa-bell"></i> Recent Alerts <a class="small fw-normal ms-2" href="{{ url_for('alerts_page', project_id=project.id) }}">see all</a></h6>
+    {% if alerts %}
+    <ul class="list-group list-group-flush">
+      {% for a in alerts %}<li class="list-group-item d-flex justify-content-between align-items-center">{{ a.message }}<span class="badge badge-{{ a.level|lower }}">{{ a.level }}</span></li>{% endfor %}
+    </ul>
+    {% else %}<p class="text-muted small mb-0">No alerts. All monitored metrics are within normal range.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+SQMA.severityDoughnut('severityChart', {{ sev_labels|tojson }}, {{ sev_values|tojson }});
+SQMA.qualityBars('componentsChart', {{ quality.components|tojson }});
+SQMA.openClosedBar('ocBar', {{ s.open_closed.open }}, {{ s.open_closed.closed }});
+SQMA.folderComparison('folderChart', {{ folder_chart|tojson }});
+SQMA.releaseComparison('releaseChart', {{ s.release_chart|tojson }});
+</script>
+{% endblock %}

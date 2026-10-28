@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Defect Prediction - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Defect Prediction</h2>
+  <p>Random Forest model estimating probability of defects from software metrics</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="metric-card text-center">
+        <div class="metric-label">Defect Probability</div>
+        <div class="metric-value">{{ (result.defect_probability * 100)|round(1) }}%</div>
+        <span class="badge badge-{{ result.risk_level|lower }}">{{ result.risk_level }} Risk</span>
+        <div class="progress mt-3" style="height:12px">
+          <div class="progress-bar {{ 'bg-danger' if result.risk_level=='High' else ('bg-warning' if result.risk_level=='Medium' else 'bg-success') }}" style="width: {{ (result.defect_probability * 100)|round(1) }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between small text-muted"><span>0%</span><span>33%</span><span>66%</span><span>100%</span></div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel h-100 mb-0">
+        <h6>Feature Importance - which inputs drove this prediction model</h6>
+        <div class="chart-box short" id="fiChart"></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h6>Inputs used for this project</h6>
+    <div class="row text-center">
+      <div class="col"><div class="fw-bold">{{ inputs.loc }}</div><div class="text-muted small">LOC</div></div>
+      <div class="col"><div class="fw-bold">{{ inputs.complexity }}</div><div class="text-muted small">Complexity</div></div>
+      <div class="col"><div class="fw-bold">{{ inputs.defect_density }}</div><div class="text-muted small">Defect density</div></div>
+      <div class="col"><div class="fw-bold">{{ inputs.reopen_rate }}</div><div class="text-muted small">Reopen rate</div></div>
+      <div class="col"><div class="fw-bold">{{ inputs.security_issues }}</div><div class="text-muted small">Security issues</div></div>
+    </div>
+    <hr>
+    <p class="small mb-1"><b>Rule:</b> defect probability = share of the 80 decision trees in the Random Forest that vote "will have defects". Risk level: &ge; 66% High, 33 - 65% Medium, below 33% Low.</p>
+    <div class="row text-center my-3">
+      <div class="col-md-4"><div class="fw-bold fs-5">{{ result.holdout_accuracy * 100 }}%</div><div class="text-muted small">Hold-out accuracy ({{ result.n_test }} unseen rows)</div></div>
+      {% for k, v in result.class_counts.items() %}<div class="col-md-4"><div class="fw-bold fs-5">{{ v }}</div><div class="text-muted small">Training class: {{ k }}</div></div>{% endfor %}
+    </div>
+    <p class="small mb-1"><b>Training data:</b> {{ result.n_train + result.n_test }} synthetic rows, {{ result.class_share_percent }}% labelled "defects" (balanced classes, stratified generation, class_weight="balanced"). Features: loc, complexity, defect_density, reopen_rate, security_issues.</p>
+    <p class="text-muted small mb-0"><i class="fa-solid fa-circle-info"></i> {{ result.note }}</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.bars('fiChart', {{ result.feature_importances.keys()|list|tojson }}, {{ result.feature_importances.values()|list|tojson }},
+  { horizontal: true, colors: {{ result.feature_importances.keys()|list|tojson }}.map(() => '#2f5fdb'), max: 1, xTitle: 'Importance (sums to 1)', format: v => v.toFixed(3), label: 'Importance' });
+</script>
+{% endblock %}

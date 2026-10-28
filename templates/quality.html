@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Quality Metrics - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Quality Metrics</h2>
+  <p>Weighted composite quality score (project-defined weights)</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="metric-card text-center">
+        <div class="metric-label">Overall Quality Score</div>
+        <div class="metric-value display-5">{{ quality.quality_score }}%</div>
+        <span class="badge badge-{{ quality.quality_level|lower|replace(' ', '-') }} fs-6">{{ quality.quality_level }}</span>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel h-100">
+        <h6>Score Formula</h6>
+        <code class="rules-block">Quality Score =
+  0.30 * Maintainability +
+  0.25 * Complexity (inverted) +
+  0.25 * Defects (inverted density) +
+  0.20 * Security (inverted findings)</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Maintainability</div><div class="metric-value">{{ quality.components.maintainability }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Complexity</div><div class="metric-value">{{ quality.components.complexity }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Defects</div><div class="metric-value">{{ quality.components.defects }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Security</div><div class="metric-value">{{ quality.components.security }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <h6>Component scores (0 - 100)</h6>
+    <div class="how-to-read mb-2"><b>How to read:</b> each bar is one ingredient of the Quality Score, converted to a 0-100 scale. Green = 80+, blue = 60+, amber = 40+, red = below 40. The lowest bar is the first thing to improve.</div>
+    <div class="chart-box" id="qualityBar"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+SQMA.qualityBars('qualityBar', {{ quality.components|tojson }});
+</script>
+{% endblock %}

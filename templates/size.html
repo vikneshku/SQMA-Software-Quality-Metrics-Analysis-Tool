@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Software Size - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Software Size</h2>
+  <p>Internal Product Measures - LOC, files, functions, classes</p>
+</div>
+<div class="page-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Files</div><div class="metric-value">{{ analysis.size.num_files }}</div></div></div>
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Total LOC</div><div class="metric-value">{{ analysis.size.total_loc }}</div></div></div>
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Logical Lines</div><div class="metric-value">{{ analysis.size.logical_lines }}</div></div></div>
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Functions</div><div class="metric-value">{{ analysis.size.num_functions }}</div></div></div>
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Classes</div><div class="metric-value">{{ analysis.size.num_classes }}</div></div></div>
+    <div class="col-md-2"><div class="metric-card"><div class="metric-label">Imports</div><div class="metric-value">{{ analysis.size.num_imports }}</div></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Comment Lines</div><div class="metric-value">{{ analysis.size.comment_lines }}</div></div></div>
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Comment Ratio</div><div class="metric-value">{{ analysis.size.comment_ratio_percent }}%</div></div></div>
+    <div class="col-md-4"><div class="metric-card"><div class="metric-label">Avg Function Size</div><div class="metric-value">{{ analysis.size.avg_function_size }} lines</div></div></div>
+  </div>
+
+  <div class="panel">
+    <h6>Per-File Breakdown</h6>
+    {% if analysis.file_analyses %}
+    <table class="table table-sm">
+      <thead><tr><th>Total Lines</th><th>Logical</th><th>Comments</th><th>Functions</th><th>Classes</th></tr></thead>
+      <tbody>
+      {% for fa in analysis.file_analyses %}
+        <tr>
+          <td>{{ fa.total_lines }}</td>
+          <td>{{ fa.logical_lines }}</td>
+          <td>{{ fa.comment_lines }}</td>
+          <td>{{ fa.num_functions }}</td>
+          <td>{{ fa.num_classes }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted small mb-0">No source files uploaded yet. Go to <a href="{{ url_for('upload_source', project_id=project.id) }}">Source Code Upload</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

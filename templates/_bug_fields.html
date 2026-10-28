@@ -1,0 +1,60 @@
+{# Shared bug form fields. Expects: f (dict of values), severities, priorities, statuses, found_in_options,
+   owasp_options, users, releases, today #}
+<div class="col-md-4">
+  <label class="form-label small mb-1">Bug title *</label>
+  <input type="text" name="title" class="form-control" maxlength="250" required value="{{ f.get('title', '') }}">
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Module</label>
+  <input type="text" name="module" class="form-control" maxlength="120" value="{{ f.get('module', 'General') }}">
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Date reported</label>
+  <input type="date" name="reported_on" class="form-control" value="{{ f.get('reported_on', today) }}" max="{{ today }}">
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Severity</label>
+  <select name="severity" class="form-select">{% for o in severities %}<option {{ 'selected' if o == f.get('severity', 'Medium') }}>{{ o }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Priority</label>
+  <select name="priority" class="form-select">{% for o in priorities %}<option {{ 'selected' if o == f.get('priority', 'Medium') }}>{{ o }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Status</label>
+  <select name="status" class="form-select">{% for o in statuses %}<option {{ 'selected' if o == f.get('status', 'Open') }}>{{ o }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Assignee</label>
+  <select name="assignee_id" class="form-select"><option value="">- unassigned -</option>
+    {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if f.get('assignee_id')|string == u.id|string }}>{{ u.username }} ({{ u.role }})</option>{% endfor %}</select>
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Release</label>
+  <select name="release_id" class="form-select"><option value="">- none -</option>
+    {% for r in releases %}<option value="{{ r.id }}" {{ 'selected' if f.get('release_id')|string == r.id|string }}>{{ r.name }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-2">
+  <label class="form-label small mb-1">Found in</label>
+  <select name="found_in" class="form-select">{% for o in found_in_options %}<option {{ 'selected' if o == f.get('found_in', 'Testing') }}>{{ o }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-3">
+  <label class="form-label small mb-1">OWASP category</label>
+  <select name="owasp_category" class="form-select">{% for o in owasp_options %}<option value="{{ o }}" {{ 'selected' if o == f.get('owasp_category', 'None') }}>{{ 'None (not a security bug)' if o == 'None' else o }}</option>{% endfor %}</select>
+</div>
+<div class="col-md-3">
+  <label class="form-label small mb-1">CVSS score (0.0 - 10.0)</label>
+  <div class="input-group">
+    <input type="number" step="0.1" min="0" max="10" name="cvss_score" class="form-control" value="{{ f.get('cvss_score', '') }}" data-cvss-input>
+    <span class="input-group-text p-1"><span class="cvss-badge cvss-None" data-cvss-badge>no score</span></span>
+  </div>
+</div>
+<div class="col-md-6">
+  <label class="form-label small mb-1">Linked source file (optional)</label>
+  <select name="code_file_id" class="form-select"><option value="">- none -</option>
+    {% for cf in code_files %}<option value="{{ cf.id }}" {{ 'selected' if f.get('code_file_id')|string == cf.id|string }}>{{ cf.relpath or cf.filename }}</option>{% endfor %}</select>
+</div>
+<div class="col-12">
+  <label class="form-label small mb-1">Description</label>
+  <textarea name="description" class="form-control" rows="2" maxlength="5000">{{ f.get('description', '') }}</textarea>
+</div>

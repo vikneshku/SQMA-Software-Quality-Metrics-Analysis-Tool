@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Control Chart - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2>Control Chart</h2>
+    <p>Bugs reported over time with centre line (CL) and control limits (UCL / LCL) - an X chart</p>
+  </div>
+  <div class="btn-group">
+    <a href="{{ url_for('control_chart_page', project_id=project.id, by='day') }}" class="btn btn-sm {{ 'btn-primary' if by=='day' else 'btn-outline-primary' }}">Per day</a>
+    <a href="{{ url_for('control_chart_page', project_id=project.id, by='week') }}" class="btn btn-sm {{ 'btn-primary' if by=='week' else 'btn-outline-primary' }}">Per week</a>
+  </div>
+</div>
+<div class="page-body">
+
+  <div class="how-to-read">
+    <i class="fa-solid fa-link"></i> <b>Corelation with Bug Management & Releases:</b>
+    This chart is directly driven by the defects logged in <a href="{{ url_for('bugs.bug_list', project_id=project.id) }}">Bug Management</a> and grouped by <a href="{{ url_for('bugs.releases', project_id=project.id) }}">Releases</a>.
+    Each defect's <i>date reported</i> is tracked in sequence (X chart).
+    You can view the defect arrival stability across the entire project or isolate a specific release.
+    <br><b>Statistical Limits:</b> CL = mean defect count; UCL = mean + {{ sigma }}&sigma;; LCL = max(0, mean &minus; {{ sigma }}&sigma;). Any point outside limits represents an <b>out-of-control spike</b> (red dot).
+  </div>
+
+  {% if selected_release %}
+  <div class="panel d-flex justify-content-between align-items-center flex-wrap gap-2 bg-light border-primary">
+    <div class="d-flex align-items-center gap-3">
+      {% if rel_readiness %}<span class="ready-light big ready-{{ rel_readiness.color }}" title="{{ rel_readiness.color }}"></span>{% endif %}
+      <div>
+        <div class="text-muted small text-uppercase">Release Context</div>
+        <div class="fs-6 fw-bold">Release: {{ selected_release.name }} ({{ selected_release.status }})</div>
+        <div class="small text-muted">
+          Date: {{ selected_release.release_date.strftime('%d %b %Y') if selected_release.release_date else 'Not set' }} &bull;
+          Bugs in Release: <b>{{ bug_count }}</b> of {{ total_project_bugs }} &bull;
+          Readiness: <b class="ready-text-{{ rel_readiness.color if rel_readiness else 'secondary' }}">{{ rel_readiness.color if rel_readiness else '-' }}</b>
+          {% if rel_readiness %}({{ rel_readiness.reasons|join('; ') }}){% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('bugs.bug_list', project_id=project.id, release=selected_release.id) }}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-bug"></i> View Bugs in Release</a>
+      <a href="{{ url_for('control_chart_page', project_id=project.id) }}" class="btn btn-sm btn-outline-secondary">Show All Releases</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <form method="GET" class="row g-2 align-items-end">
+      <input type="hidden" name="by" value="{{ by }}">
+      <div class="col-md-4">
+        <label class="form-label small mb-1"><i class="fa-solid fa-code-branch"></i> Release Filter</label>
+        <select name="release" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Releases ({{ total_project_bugs }} total bugs)</option>
+          <option value="none" {{ 'selected' if release_id == 'none' }}>Unassigned to any release</option>
+          {% for r in releases %}
+          <option value="{{ r.id }}" {{ 'selected' if release_id == r.id|string }}>Release: {{ r.name }} ({{ r.status }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3"><label class="form-label small mb-1">Variance type</label>
+        <select name="variance" class="form-select form-select-sm">{% for v in variance_types %}<option value="{{ v }}" {{ 'selected' if v==variance }}>{{ 'Sample (n - 1)' if v=='sample' else 'Population (n)' }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label small mb-1">Control limit sigma</label>
+        <select name="sigma" class="form-select form-select-sm">{% for k in sigma_choices %}<option value="{{ k }}" {{ 'selected' if k==sigma }}>{{ k }} sigma{{ ' (default)' if k==3 }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Apply</button></div>
+    </form>
+    <p class="small text-muted mt-2 mb-0"><b>Options used:</b> {{ sigma }}-sigma limits, {{ variance }} standard deviation.
+      <b>Sample</b> variance divides by n-1 and is used when the data is a sample of a bigger process (default for bug data); <b>population</b> variance divides by n and is used when you have every value.
+      <b>3 sigma</b> catches only very unusual points (about 99.7% of normal variation); <b>2 sigma</b> is more sensitive but gives more false alarms.</p>
+  </div>
+
+  {% if chart_data.error %}
+  <div class="panel">
+    <div class="chart-empty" style="min-height:220px">
+      <i class="fa-solid fa-chart-line"></i>
+      <span><b>Control chart not available yet.</b><br>{{ chart_data.error }}</span>
+      <div class="d-flex gap-2 mt-1 flex-wrap justify-content-center">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('bugs.bug_list', project_id=project.id) }}"><i class="fa-solid fa-bug"></i> Go to Bug Management</a>
+        <form method="POST" action="{{ url_for('bugs.bugs_demo', project_id=project.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Load demo bugs</button></form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Centre line (CL)</div><div class="metric-value text-success">{{ chart_data.center_line }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Upper limit (UCL)</div><div class="metric-value text-danger">{{ chart_data.ucl }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Lower limit (LCL)</div><div class="metric-value text-danger">{{ chart_data.lcl }}</div></div></div>
+    <div class="col-md-3"><div class="metric-card"><div class="metric-label">Out-of-control points</div><div class="metric-value {{ 'text-danger' if not chart_data.stable else 'text-success' }}">{{ chart_data.out_of_control_points|length }}</div></div></div>
+  </div>
+  <div class="panel">
+    <div class="chart-box tall" id="controlChart"></div>
+    <p class="mt-3 mb-1 fw-bold {{ 'text-success' if chart_data.stable else 'text-danger' }}">
+      <i class="fa-solid {{ 'fa-circle-check' if chart_data.stable else 'fa-triangle-exclamation' }}"></i> {{ chart_data.interpretation }}
+    </p>
+    {% if chart_data.out_of_control_points %}
+    <p class="small mb-0">Flagged: {% for p in chart_data.out_of_control_points %}<span class="badge badge-critical me-1">{{ p.label }}: {{ p.value }} bugs</span>{% endfor %}</p>
+    {% endif %}
+    <p class="small text-muted mt-2 mb-0">Working: mean = {{ chart_data.mean }}, sigma = {{ chart_data.sigma }} &rarr; UCL = {{ chart_data.mean }} + {{ sigma }} &times; {{ chart_data.sigma }} = {{ chart_data.ucl }}; LCL = max(0, {{ chart_data.mean }} &minus; {{ sigma }} &times; {{ chart_data.sigma }}) = {{ chart_data.lcl }}.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if not chart_data.error %}
+<script>SQMA.controlChart('controlChart', {{ chart_data|tojson }});</script>
+{% endif %}
+{% endblock %}

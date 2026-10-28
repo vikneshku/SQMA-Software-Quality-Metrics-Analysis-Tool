@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header"><h2>{{ page_title }}</h2><p>{{ project.name }}</p></div>
+<div class="page-body">
+  <div class="panel">
+    <div class="chart-empty" style="min-height:260px">
+      <i class="fa-solid fa-file-code" style="font-size:2.6rem"></i>
+      <span><b>Upload your source code first</b> - this page needs code metrics to work.</span>
+      <a class="btn btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}"><i class="fa-solid fa-upload"></i> Go to Source Code Upload</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

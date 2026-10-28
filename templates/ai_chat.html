@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}AI Assistant - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2><i class="fa-solid fa-robot text-primary me-2"></i>AI Assistant</h2>
+    <p class="mb-0 text-muted">Ask questions about this project - the assistant analyzes your real metrics (quality, risk, bugs, releases, riskiest files, alerts).</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#apiKeyBox" aria-expanded="false">
+      <i class="fa-solid fa-key me-1"></i> {% if configured %}Change API Key{% else %}Configure API Key{% endif %}
+    </button>
+    <button class="btn btn-sm btn-outline-danger" id="clearChat"><i class="fa-solid fa-trash me-1"></i> Clear history</button>
+  </div>
+</div>
+
+<div class="page-body">
+  <!-- Collapsible API Key Configuration Box -->
+  <div class="collapse mb-3" id="apiKeyBox">
+    <div class="card card-body border-primary bg-light shadow-sm">
+      <h6 class="fw-bold text-primary mb-2"><i class="fa-solid fa-sliders me-1"></i> Google Gemini API Settings</h6>
+      <p class="small text-muted mb-2">
+        Enter your Google Gemini API key below. It will be securely stored in your local <code>.env</code> file.
+        Get a free API key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square small"></i></a>.
+      </p>
+      <div class="row g-2 align-items-center">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold mb-1" for="geminiApiKey">Gemini API Key</label>
+          <input type="password" id="geminiApiKey" class="form-control form-control-sm" placeholder="AIzaSy..." autocomplete="off">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1" for="geminiModel">Model</label>
+          <select id="geminiModel" class="form-select form-select-sm">
+            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (Recommended)</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="gemini-flash-latest">gemini-flash-latest</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end pt-md-3">
+          <button class="btn btn-sm btn-primary w-100" id="saveKeyBtn">
+            <i class="fa-solid fa-floppy-disk me-1"></i> Save
+          </button>
+        </div>
+      </div>
+      <div id="saveKeyStatus" class="small mt-2" style="display:none;"></div>
+    </div>
+  </div>
+
+  {% if not configured %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <b><i class="fa-solid fa-key"></i> AI is not set up yet.</b> {{ setup }}
+    </div>
+    <button class="btn btn-sm btn-warning fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#apiKeyBox">
+      <i class="fa-solid fa-gear me-1"></i> Enter API Key
+    </button>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <!-- Quick Question Prompt Chips -->
+    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+      <span class="small fw-semibold text-muted me-1"><i class="fa-regular fa-lightbulb me-1"></i> Suggestions:</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary prompt-chip py-1 px-2" data-prompt="Which module has more risk?">
+        Which module has more risk?
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary prompt-chip py-1 px-2" data-prompt="Is the latest release ready to ship?">
+        Is the latest release ready?
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary prompt-chip py-1 px-2" data-prompt="What should we fix first?">
+        What should we fix first?
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary prompt-chip py-1 px-2" data-prompt="What is our defect density and code quality?">
+        Defect density &amp; Quality
+      </button>
+    </div>
+
+    <div class="chat-box" id="chat">
+      {% if not history %}
+      <div class="text-muted small" id="chatHint">
+        <i class="fa-solid fa-comments me-1"></i> Ask any question above or type your own question below.
+      </div>
+      {% endif %}
+      {% for m in history %}
+      <div class="msg {{ m.role }}" data-role="{{ m.role }}">{{ m.content }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="input-group mt-3">
+      <input id="q" class="form-control" maxlength="2000" placeholder="Ask about this project (e.g. Which module is more risk?)..." autocomplete="off">
+      <button class="btn btn-primary px-4" id="send"><i class="fa-solid fa-paper-plane me-1"></i> Send</button>
+    </div>
+    <div class="d-flex justify-content-between align-items-center small text-muted mt-2">
+      <div>Model: <strong>{{ model }}</strong>. Answers are grounded in real project metrics (quality, risk, bugs, releases, alerts).</div>
+      <div class="fst-italic">SQMA Intelligence Engine active</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var chat = document.getElementById('chat'), q = document.getElementById('q'), send = document.getElementById('send');
+  var URL_SEND = {{ url_for('ai.chat_send', project_id=project.id)|tojson }};
+  var URL_LOCAL = {{ url_for('ai.chat_local_answer', project_id=project.id)|tojson }};
+  var URL_SAVE_KEY = {{ url_for('ai.save_ai_key', project_id=project.id)|tojson }};
+  var URL_CLEAR = {{ url_for('ai.chat_clear', project_id=project.id)|tojson }};
+
+  chat.querySelectorAll('.msg.model').forEach(function (m) { SQMA_AI.render(m, m.textContent); });
+  chat.scrollTop = chat.scrollHeight;
+
+  function add(role, text, isError) {
+    var h = document.getElementById('chatHint'); if (h) h.remove();
+    var d = document.createElement('div'); d.className = 'msg ' + role + (isError ? ' border-warning' : '');
+    if (role === 'model' && !isError) SQMA_AI.render(d, text); else d.textContent = text;
+    chat.appendChild(d); chat.scrollTop = chat.scrollHeight; return d;
+  }
+
+  async function ask(queryText) {
+    var text = (typeof queryText === 'string' ? queryText : q.value).trim();
+    if (!text) return;
+    add('user', text); q.value = ''; send.disabled = true;
+    var wait = add('model', 'Analyzing project metrics...', true);
+
+    try {
+      var r = await SQMA_AI.post(URL_SEND, { message: text });
+      wait.remove();
+      if (r && r.ok) {
+        add('model', r.answer);
+      } else {
+        // External call failed or key not configured - use built-in SQMA metrics engine
+        var localResp = await SQMA_AI.post(URL_LOCAL, { message: text });
+        if (localResp && localResp.ok) {
+          var note = (r && r.kind === 'no_key') ? '' : ('*(Note: Gemini generative API: ' + (r.message || 'not reachable') + ' — answering via built-in SQMA Metrics Intelligence Engine)*\n\n');
+          add('model', note + localResp.answer);
+        } else {
+          add('model', (r && r.message) ? r.message : 'Unable to complete analysis.', true);
+        }
+      }
+    } catch (e) {
+      wait.remove();
+      var localResp2 = await SQMA_AI.post(URL_LOCAL, { message: text });
+      if (localResp2 && localResp2.ok) {
+        add('model', localResp2.answer);
+      } else {
+        add('model', 'Error contacting analysis service.', true);
+      }
+    } finally {
+      send.disabled = false;
+      q.focus();
+    }
+  }
+
+  send.onclick = function() { ask(); };
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter') ask(); });
+
+  // Quick suggestion chips
+  document.querySelectorAll('.prompt-chip').forEach(function(btn) {
+    btn.onclick = function() {
+      var prompt = this.getAttribute('data-prompt');
+      ask(prompt);
+    };
+  });
+
+  document.getElementById('clearChat').onclick = async function () {
+    if (!confirm('Delete your chat history for this project?')) return;
+    await SQMA_AI.post(URL_CLEAR, {}); chat.innerHTML = '';
+  };
+
+  // API Key saving
+  var saveKeyBtn = document.getElementById('saveKeyBtn');
+  if (saveKeyBtn) {
+    saveKeyBtn.onclick = async function () {
+      var keyInput = document.getElementById('geminiApiKey');
+      var modelSelect = document.getElementById('geminiModel');
+      var statusDiv = document.getElementById('saveKeyStatus');
+      var key = keyInput.value.trim();
+      var model = modelSelect.value;
+      if (!key) {
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'small text-danger mt-2';
+        statusDiv.textContent = 'Please enter a Gemini API Key.';
+        return;
+      }
+      saveKeyBtn.disabled = true;
+      statusDiv.style.display = 'block';
+      statusDiv.className = 'small text-muted mt-2';
+      statusDiv.textContent = 'Saving configuration...';
+
+      var res = await SQMA_AI.post(URL_SAVE_KEY, { api_key: key, model: model });
+      saveKeyBtn.disabled = false;
+      if (res && res.ok) {
+        statusDiv.className = 'small text-success mt-2 fw-semibold';
+        statusDiv.textContent = 'Key saved successfully! Reloading...';
+        setTimeout(function () { location.reload(); }, 900);
+      } else {
+        statusDiv.className = 'small text-danger mt-2';
+        statusDiv.textContent = (res && res.message) ? res.message : 'Failed to save API key.';
+      }
+    };
+  }
+})();
+</script>
+{% endblock %}

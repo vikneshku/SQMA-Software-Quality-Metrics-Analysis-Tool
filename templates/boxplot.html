@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Box Plot - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2>Box Plot</h2>
+    <p>Distribution and outlier detection - five-number summary drawn as a box-and-whisker diagram</p>
+  </div>
+  <div class="btn-group">
+    <a href="{{ url_for('boxplot_page', project_id=project.id, metric='complexity') }}" class="btn btn-sm {{ 'btn-primary' if metric=='complexity' else 'btn-outline-primary' }}">Complexity</a>
+    <a href="{{ url_for('boxplot_page', project_id=project.id, metric='size') }}" class="btn btn-sm {{ 'btn-primary' if metric=='size' else 'btn-outline-primary' }}">Function size</a>
+  </div>
+</div>
+<div class="page-body">
+  {% if result.error %}
+  <div class="panel"><div class="chart-empty" style="min-height:200px"><i class="fa-solid fa-box"></i><span>{{ result.error }}</span>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('upload_source', project_id=project.id) }}">Go to Source Code Upload</a></div></div>
+  {% else %}
+  <div class="row g-3 mb-3">
+    <div class="col"><div class="metric-card"><div class="metric-label">Lowest value</div><div class="metric-value">{{ result.min }}</div></div></div>
+    <div class="col"><div class="metric-card"><div class="metric-label">Q1</div><div class="metric-value">{{ result.q1 }}</div></div></div>
+    <div class="col"><div class="metric-card"><div class="metric-label">Median</div><div class="metric-value">{{ result.median }}</div></div></div>
+    <div class="col"><div class="metric-card"><div class="metric-label">Q3</div><div class="metric-value">{{ result.q3 }}</div></div></div>
+    <div class="col"><div class="metric-card"><div class="metric-label">Highest value</div><div class="metric-value">{{ result.max }}</div></div></div>
+    <div class="col"><div class="metric-card"><div class="metric-label">IQR</div><div class="metric-value">{{ result.iqr }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="how-to-read">
+      <b>How to read:</b> the <b>box</b> holds the middle 50% of the values (from Q1 to Q3, width = IQR); the <b>thick line</b> inside is the median; the <b>whiskers</b> reach the smallest and largest values that are not outliers;
+      <span style="color:#dc2626"><b>red dots</b></span> are <b>outliers</b> - values beyond Q1 &minus; 1.5&middot;IQR or Q3 + 1.5&middot;IQR (dashed lines).
+    </div>
+    <div class="legend-row">
+      <span><span class="sq" style="background:#bfe3c8;border:1px solid #6b7280"></span>Box = Q1 to Q3</span>
+      <span><span class="sq" style="background:#111;height:12px;width:4px"></span>Median</span>
+      <span><span class="dot" style="background:#dc2626"></span>Outlier</span>
+      <span><span class="sq" style="border-top:2px dashed #9ca3af;height:0;width:18px"></span>Outlier fence</span>
+    </div>
+    <div id="boxplotChart" class="chart-box auto"></div>
+    <p class="mt-2 mb-1"><b>{{ result.interpretation }}</b></p>
+    <p class="small text-muted mb-0">Working: IQR = Q3 &minus; Q1 = {{ result.q3 }} &minus; {{ result.q1 }} = {{ result.iqr }}; lower fence = {{ result.q1 }} &minus; 1.5 &times; {{ result.iqr }} = {{ result.lower_fence }}; upper fence = {{ result.q3 }} + 1.5 &times; {{ result.iqr }} = {{ result.upper_fence }}.
+      {% if result.outliers %}Outlier value(s): {{ result.outliers|join(', ') }}.{% endif %}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if not result.error %}
+<script>SQMA.boxplot('boxplotChart', {{ result|tojson }}, {{ unit|tojson }});</script>
+{% endif %}
+{% endblock %}

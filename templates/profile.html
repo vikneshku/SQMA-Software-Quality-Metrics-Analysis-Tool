@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}My profile - SQMA Tool{% endblock %}
+{% block content %}
+<div class="page-header"><h2>My profile</h2><p>{{ current_user.display_name }} &middot; {{ current_user.role }}</p></div>
+<div class="page-body">
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="panel">
+        <h6><i class="fa-solid fa-key"></i> REST API token</h6>
+        <p class="small text-muted">Send it as <code>Authorization: Bearer &lt;token&gt;</code> to <code>/api/v1/...</code> (see README for curl examples). Treat it like a password.</p>
+        <div class="input-group mb-2">
+          <input class="form-control font-monospace" id="tok" value="{{ current_user.api_token }}" readonly>
+          <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('tok').value)">Copy</button>
+        </div>
+        <form method="POST" onsubmit="return confirm('Generate a new token? The old one stops working.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="token">
+          <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-rotate"></i> Regenerate token</button>
+        </form>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="panel">
+        <h6><i class="fa-solid fa-lock"></i> Change password</h6>
+        <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="password">
+          <div class="mb-2"><input type="password" name="current" class="form-control" placeholder="Current password" required autocomplete="current-password"></div>
+          <div class="mb-2"><input type="password" name="password" class="form-control" placeholder="New password (8+ characters)" required minlength="8" autocomplete="new-password"></div>
+          <div class="mb-2"><input type="password" name="password2" class="form-control" placeholder="Repeat new password" required minlength="8" autocomplete="new-password"></div>
+          <button class="btn btn-primary btn-sm">Change password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Files - {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-header"><h2>Files</h2><p>Every analysed source file with its cached metrics. Click a path for the file detail page.</p></div>
+<div class="page-body"><div class="panel">{% include "_files_table.html" %}
+  <p class="small text-muted mt-3 mb-0"><b>Risk colour:</b> green Low, amber Medium, red High, dark red Critical. Bayesian evidence per file: avg complexity &gt; 10, linked-bug density &gt; 3 per KLOC, any security issue, maintainability &lt; 40. Critical = High risk plus 2+ High issues or a function with complexity &gt; 30.</p></div></div>
+{% endblock %}
